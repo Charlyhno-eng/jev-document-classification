@@ -1,4 +1,5 @@
 import { DollarSign, Eye, FileText, Languages, RotateCcw, Zap } from 'lucide-react';
+import type { RunPerformance } from '../lib/run-metrics';
 import type { Classification, RunSummary } from '../types';
 
 type Props = {
@@ -9,15 +10,24 @@ type Props = {
   classified: number;
   languageBreakdown: Record<string, number>;
   categoryBreakdown: Record<string, number>;
+  performance: RunPerformance;
   onPreview: (item: Classification) => void;
   onUndo: (item: Classification) => void;
   undoingId: string | null;
 };
 
-export function RunDashboard({ results, summary, totalCost, totalTokens, classified, languageBreakdown, categoryBreakdown, onPreview, onUndo, undoingId }: Props) {
+export function RunDashboard({ results, summary, totalCost, totalTokens, classified, languageBreakdown, categoryBreakdown, performance, onPreview, onUndo, undoingId }: Props) {
   return <section className="mt-14">
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Run dashboard</p><h2 className="mt-2 text-3xl font-bold tracking-tight">Classification report</h2></div>{summary && <p className="text-sm text-slate-500">Completed {summary.completedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}</div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={<FileText size={18} />} label="Files classified" value={`${classified} / ${results.length}`} /><Metric icon={<Languages size={18} />} label="Languages found" value={`${Object.keys(languageBreakdown).length}`} /><Metric icon={<Zap size={18} />} label="Total time" value={summary ? formatDuration(summary.durationMs) : 'In progress'} /><Metric icon={<DollarSign size={18} />} label="JEV API cost" value={formatMoney(summary?.totalCost ?? totalCost)} detail={`${(summary?.totalInputTokens ?? totalTokens).toLocaleString()} input tokens`} /></div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Metric icon={<FileText size={18} />} label="Files classified" value={`${classified} / ${results.length}`} />
+      <Metric icon={<Languages size={18} />} label="Languages found" value={`${Object.keys(languageBreakdown).length}`} />
+      <Metric icon={<Zap size={18} />} label="Total time" value={summary ? formatDuration(summary.durationMs) : 'In progress'} />
+      <Metric icon={<DollarSign size={18} />} label="JEV API cost" value={formatMoney(summary?.totalCost ?? totalCost)} detail={`${(summary?.totalInputTokens ?? totalTokens).toLocaleString()} input tokens`} />
+      <Metric icon={<DollarSign size={18} />} label="Cache savings" value={formatMoney(performance.savedCost)} detail={`${performance.savedInputTokens.toLocaleString()} input tokens avoided${performance.cacheHits ? ` · ${performance.cacheHits} cache hit${performance.cacheHits === 1 ? '' : 's'}` : ''}`} />
+      <Metric icon={<Zap size={18} />} label="Throughput" value={performance.documentsPerMinute === null ? 'In progress' : `${performance.documentsPerMinute.toFixed(1)} files/min`} />
+      <Metric icon={<FileText size={18} />} label="Average confidence" value={performance.averageConfidence === null ? 'Unavailable' : `${Math.round(performance.averageConfidence * 100)}%`} detail={performance.confidenceCount ? `${performance.confidenceCount} JEV decision${performance.confidenceCount === 1 ? '' : 's'}` : undefined} />
+    </div>
     <div className="mt-5 grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
       <section className="glass-card p-6"><h3 className="font-bold">Destination overview</h3><div className="mt-5 space-y-4">{Object.entries(categoryBreakdown).map(([category, count]) => <Breakdown key={category} label={category} value={count} total={results.length} />)}{Object.entries(languageBreakdown).map(([language, count]) => <Breakdown key={language} label={language} value={count} total={classified} subtle />)}</div></section>
       <DocumentAudit results={results} onPreview={onPreview} onUndo={onUndo} undoingId={undoingId} />
@@ -35,7 +45,7 @@ function AuditCard({ item, onPreview, onUndo, undoing }: { item: Classification;
     <div className="audit-card-header"><div className="min-w-0"><div className="flex items-center gap-2 font-medium text-slate-200"><FileText size={16} className="shrink-0 text-slate-600" /><span className="truncate">{item.fileName}</span></div>{item.error && <p className="mt-1 text-xs text-rose-400">{item.error}</p>}</div><div className="audit-card-actions">{status}{item.moved && <div className="audit-actions"><button type="button" className="audit-button" onClick={() => onPreview(item)}><Eye size={14} />View</button><button type="button" className="audit-button" disabled={undoing} onClick={() => onUndo(item)}><RotateCcw size={14} />{undoing ? 'Restoring' : 'Undo'}</button></div>}</div></div>
     <div className="audit-details">
       <AuditDetail label="Category"><span>{item.category}</span>{item.suggestedCategory && <small>Suggested: {item.suggestedCategory}</small>}</AuditDetail>
-      <AuditDetail label="Confidence">{item.confidence === null ? 'Unavailable' : `${Math.round(item.confidence * 100)}%`}</AuditDetail>
+      <AuditDetail label="Confidence">{item.confidence === null ? 'Unavailable' : `${Math.round(item.confidence * 100)}%`}{item.cacheHit && <small>Reused from local cache</small>}</AuditDetail>
       {item.unprocessable ? <AuditDetail label="Details" wide>{item.note ?? 'This file cannot be processed by JEV.'}</AuditDetail> : <><AuditDetail label="Language">{item.language}</AuditDetail><AuditDetail label="Precise subject" wide>{item.subject}</AuditDetail></>}
     </div>
   </article>;

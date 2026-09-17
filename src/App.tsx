@@ -88,7 +88,7 @@ export function App() {
         </section>
         {model.isRunning && model.activeFile && <p className="mt-3 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin text-[#14f195]" size={15} />Working on <span className="font-medium text-slate-300">{model.activeFile}</span></p>}
 
-        {(model.results.length > 0 || model.summary) && <RunDashboard results={model.results} summary={model.summary} totalCost={model.totalCost} totalTokens={model.totalTokens} classified={model.classified} languageBreakdown={model.languageBreakdown} categoryBreakdown={model.categoryBreakdown} onPreview={model.previewDocument} onUndo={model.undoMove} undoingId={model.undoingId} />}
+        {(model.results.length > 0 || model.summary) && <RunDashboard results={model.results} summary={model.summary} totalCost={model.totalCost} totalTokens={model.totalTokens} classified={model.classified} languageBreakdown={model.languageBreakdown} categoryBreakdown={model.categoryBreakdown} performance={model.performance} onPreview={model.previewDocument} onUndo={model.undoMove} undoingId={model.undoingId} />}
         </>}
       </div>
 

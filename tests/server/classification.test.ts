@@ -28,6 +28,19 @@ test('rejects model output outside configured categories', async () => {
   await assert.rejects(() => classifyDocument(input, runner), /outside the configured choices/);
 });
 
+test('uses a bounded subject-choice set and compact structured context', async () => {
+  let choiceCount = 0;
+  let context = '';
+  const result = await classifyDocument({ ...input, text: `${input.text}\n${'Secure wallet recovery policy.\n'.repeat(2_000)}` }, async (request) => {
+    choiceCount = request.subjectCandidates.length;
+    context = request.documentContext;
+    return { category: 'Doctoral thesis', categoryConfidence: 0.9, language: 'English', subject: request.subjectCandidates[0], inputTokens: 10 };
+  });
+  assert.ok(choiceCount <= 10);
+  assert.ok(context.length <= 4_500);
+  assert.equal(result.category, 'Doctoral thesis');
+});
+
 test('routes low-confidence classifications to Need review while retaining the suggested category', async () => {
   const runner: EvaluationRunner = async (request) => ({
     category: 'Whitepaper', categoryConfidence: 0.74, language: 'English', subject: request.subjectCandidates[0], inputTokens: 1,

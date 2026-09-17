@@ -1,6 +1,6 @@
 import { extractSubjectCandidates } from './subject.js';
 
-export const MAX_DOCUMENT_PROFILE_CHARACTERS = 6_000;
+export const MAX_DOCUMENT_PROFILE_CHARACTERS = 4_500;
 
 export type DocumentProfile = {
   content: string;
@@ -17,12 +17,11 @@ export function buildDocumentProfile(fileName: string, text: string): DocumentPr
   }
 
   const lines = source.split(/\r?\n/).map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const headings = lines.filter((line) => line.length <= 140 && wordCount(line) >= 2 && wordCount(line) <= 14).slice(0, 8);
-  const subjects = extractSubjectCandidates(fileName, source, 10);
+  const headings = lines.filter((line) => line.length <= 140 && wordCount(line) >= 2 && wordCount(line) <= 14).slice(0, 6);
+  const subjects = extractSubjectCandidates(fileName, source, 8);
   const excerpts = selectExcerpts(source);
   const content = limitProfile([
     `Document filename: ${fileName}`,
-    `Document length: ${source.length.toLocaleString()} characters`,
     headings.length ? `Likely headings:\n${headings.map((heading) => `- ${heading}`).join('\n')}` : '',
     `Subject candidates:\n${subjects.map((subject) => `- ${subject}`).join('\n')}`,
     `Representative excerpts:\n${excerpts.map((excerpt, index) => `[${index + 1}] ${excerpt}`).join('\n\n')}`,
@@ -31,7 +30,7 @@ export function buildDocumentProfile(fileName: string, text: string): DocumentPr
 }
 
 function selectExcerpts(source: string) {
-  const excerptLength = 1_250;
+  const excerptLength = 950;
   const positions = [0, Math.floor(source.length * 0.42), Math.floor(source.length * 0.8)];
   return positions.map((position) => cleanExcerpt(source.slice(position, position + excerptLength))).filter((excerpt, index, all) => excerpt && all.indexOf(excerpt) === index);
 }

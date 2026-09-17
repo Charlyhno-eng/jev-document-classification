@@ -6,7 +6,7 @@ import {
 import { readDocumentText } from '../lib/documents';
 import { listRootFiles, moveToCategory, restoreFromCategory } from '../lib/file-system';
 import { mapWithConcurrency } from '../lib/concurrency';
-import { buildLanguageBreakdown } from '../lib/run-metrics';
+import { buildLanguageBreakdown, buildRunPerformance } from '../lib/run-metrics';
 import type { Classification, RunSummary } from '../types';
 import { extensionOf, isPreviewableImage, isSupportedDocument, NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER, unsupportedDocumentMessage } from '../../shared/document-policy';
 
@@ -43,6 +43,7 @@ export function useDocumentClassification() {
   const classified = results.filter((item) => item.moved && !item.unprocessable).length;
   const languageBreakdown = useMemo(() => buildLanguageBreakdown(results), [results]);
   const categoryBreakdown = useMemo(() => countBy(results, (item) => item.category), [results]);
+  const runPerformance = useMemo(() => buildRunPerformance(results, summary?.durationMs ?? null), [results, summary]);
 
   useEffect(() => {
     void loadConfig().then((config) => {
@@ -187,7 +188,8 @@ export function useDocumentClassification() {
           record = {
             id: crypto.randomUUID(), fileName: item.name, category: data.destinationCategory, suggestedCategory: data.needsReview ? data.category : undefined,
             destinationFileName: data.movedFileName ?? item.name, needsReview: data.needsReview, language: data.language, subject: data.subject,
-            confidence: data.categoryConfidence, inputTokens: data.usage.inputTokens ?? 0, cost: data.cost, moved: true,
+            confidence: data.categoryConfidence, cacheHit: data.cacheHit, savedInputTokens: data.savedInputTokens, savedCost: data.savedCost,
+            inputTokens: data.usage.inputTokens ?? 0, cost: data.cost, moved: true,
             unprocessable: data.unprocessable, note: data.note,
           };
         } catch (reason) {
@@ -290,7 +292,7 @@ export function useDocumentClassification() {
   return {
     sourceFolder, categories, newCategory, setNewCategory, apiKey, setApiKey, apiKeyConfigured, gatewayCredits, configLoaded,
     showApiKey, setShowApiKey, isSavingApiKey, isSavingCategories, results, summary, fileCount,
-    isRunning, activeFile, notice, error, totalCost, totalTokens, classified, languageBreakdown,
+    isRunning, activeFile, notice, error, totalCost, totalTokens, classified, languageBreakdown, performance: runPerformance,
     categoryBreakdown, undoingId, preview, selectFolder, addCategory, removeCategory,
     saveApiKey, runClassification, undoMove, previewDocument, closePreview, refreshGatewayCredits,
     loadSavedApiKey, clearApiKeyInput,
@@ -315,6 +317,9 @@ async function moveBrowserFileToNotProcessable(
     subject: '—',
     usage: { inputTokens: 0 },
     cost: 0,
+    cacheHit: false,
+    savedInputTokens: 0,
+    savedCost: 0,
     unprocessable: true,
     note,
     movedFileName,

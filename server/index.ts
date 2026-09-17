@@ -3,7 +3,7 @@ import path from 'node:path';
 import cors from 'cors';
 import express from 'express';
 import { readFile } from 'node:fs/promises';
-import { classifyDocument } from './classification.js';
+import { classifyCachedDocument } from './classification-cache.js';
 import { readAppConfig, toPublicConfig, writeApiKey, writeCategories } from './config.js';
 import { categoryDocumentPath, chooseDirectory, listRootFileNames, readDocumentText, restoreFileFromCategory } from './documents.js';
 import { processLocalDocument } from './local-classification.js';
@@ -105,7 +105,7 @@ app.post('/api/classify', async (request, response) => {
     resolveRootFile('/virtual-root', fileName);
     const config = await readAppConfig();
     if (!config.apiKey) throw new Error('Configure a Vercel AI Gateway API key before starting a run.');
-    response.json(await classifyDocument({ fileName, text: text.trim(), categories: config.categories, apiKey: config.apiKey }));
+    response.json(await classifyCachedDocument({ fileName, text: text.trim(), categories: config.categories, apiKey: config.apiKey }));
   } catch (error) {
     response.status(422).json({ error: messageOf(error) });
   }

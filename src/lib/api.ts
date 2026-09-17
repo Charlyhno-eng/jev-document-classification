@@ -7,6 +7,9 @@ export type ClassificationApiResult = {
   subject: string;
   usage: { inputTokens?: number };
   cost: number;
+  cacheHit?: boolean;
+  savedInputTokens?: number;
+  savedCost?: number;
   unprocessable?: boolean;
   note?: string;
   movedFileName?: string;

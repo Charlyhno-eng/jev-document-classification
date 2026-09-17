@@ -1,4 +1,5 @@
-import { classifyDocument } from './classification.js';
+import { classifyCachedDocument } from './classification-cache.js';
+import type { ClassificationInput, ClassificationResult } from './classification.js';
 import { moveFileToCategory, readDocumentText, safeRootFile } from './documents.js';
 import { isSupportedDocument, NOT_PROCESSABLE_FOLDER, unsupportedDocumentMessage } from '../shared/document-policy.js';
 
@@ -8,7 +9,7 @@ type LocalClassificationConfig = {
 };
 
 type LocalClassificationDependencies = {
-  classify?: typeof classifyDocument;
+  classify?: (input: ClassificationInput) => Promise<ClassificationResult>;
   extract?: typeof readDocumentText;
   move?: typeof moveFileToCategory;
 };
@@ -35,7 +36,7 @@ export async function processLocalDocument(
 ): Promise<LocalClassificationResult> {
   const extract = dependencies.extract ?? readDocumentText;
   const move = dependencies.move ?? moveFileToCategory;
-  const classify = dependencies.classify ?? classifyDocument;
+  const classify = dependencies.classify ?? classifyCachedDocument;
 
   if (!isSupportedDocument(fileName)) {
     return moveToNotProcessable(directoryPath, fileName, unsupportedDocumentMessage(fileName), move);

@@ -5,6 +5,28 @@ import { NEED_REVIEW_FOLDER, needsReview } from '../shared/document-policy.js';
 
 export const PRICE_PER_MILLION_INPUT_TOKENS = 0.04;
 export type ClassificationContextMode = 'structured' | 'full';
+export const MAX_SUBJECT_CHOICES = 10;
+
+export type ClassificationInput = {
+  apiKey: string;
+  fileName: string;
+  text: string;
+  categories: string[];
+};
+
+export type ClassificationResult = {
+  category: string;
+  categoryConfidence: number | null;
+  destinationCategory: string;
+  needsReview: boolean;
+  language: string;
+  subject: string;
+  usage: { inputTokens: number };
+  cost: number;
+  cacheHit?: boolean;
+  savedInputTokens?: number;
+  savedCost?: number;
+};
 
 export type ClassificationDecision = {
   category: string;
@@ -14,11 +36,7 @@ export type ClassificationDecision = {
   inputTokens: number;
 };
 
-type EvaluationInput = {
-  apiKey: string;
-  fileName: string;
-  text: string;
-  categories: string[];
+type EvaluationInput = ClassificationInput & {
   subjectCandidates: string[];
   documentContext: string;
 };
@@ -26,11 +44,11 @@ type EvaluationInput = {
 export type EvaluationRunner = (input: EvaluationInput) => Promise<ClassificationDecision>;
 
 export async function classifyDocument(
-  input: Omit<EvaluationInput, 'subjectCandidates' | 'documentContext'>,
+  input: ClassificationInput,
   runner: EvaluationRunner = runJevEvaluation,
   options: { contextMode?: ClassificationContextMode } = {},
-) {
-  const subjectCandidates = extractSubjectCandidates(input.fileName, input.text);
+): Promise<ClassificationResult> {
+  const subjectCandidates = extractSubjectCandidates(input.fileName, input.text, MAX_SUBJECT_CHOICES);
   const documentContext = buildClassificationContext(input.fileName, input.text, options.contextMode ?? 'structured');
   const decision = await runner({ ...input, subjectCandidates, documentContext });
   if (!input.categories.includes(decision.category)) throw new Error('JEV returned a category outside the configured choices.');
@@ -55,23 +73,22 @@ export function buildClassificationContext(fileName: string, text: string, mode:
 
 async function runJevEvaluation(input: EvaluationInput): Promise<ClassificationDecision> {
   const gateway = createGateway({ apiKey: input.apiKey });
-  const categoryCriteria = Object.fromEntries(input.categories.map((category) => [category, `The document belongs in the ${category} folder.`]));
-  const subjectCriteria = Object.fromEntries(input.subjectCandidates.map((subject) => [subject, `This phrase most precisely describes the document's central topic.`]));
+  const categoryCriteria = Object.fromEntries(input.categories.map((category) => [category, `Destination: ${category}.`]));
+  const subjectCriteria = Object.fromEntries(input.subjectCandidates.map((subject) => [subject, `Subject: ${subject}.`]));
   const result = await evaluate({
     model: gateway.evaluation('typesafe-ai/jev'),
     state: input.documentContext,
     questions: {
-      category: { type: 'choice', instructions: 'Choose the one configured destination folder that best fits this document.', criteria: categoryCriteria },
+      category: { type: 'choice', instructions: 'Choose the best configured destination folder.', criteria: categoryCriteria },
       language: {
         type: 'choice',
         instructions: 'Identify the primary language used in the document.',
         criteria: {
-          English: 'The primary language is English.', French: 'The primary language is French.', Spanish: 'The primary language is Spanish.',
-          German: 'The primary language is German.', Italian: 'The primary language is Italian.', Portuguese: 'The primary language is Portuguese.',
-          Dutch: 'The primary language is Dutch.', Other: 'Another language or not enough readable text to identify one.',
+          English: 'English.', French: 'French.', Spanish: 'Spanish.', German: 'German.', Italian: 'Italian.', Portuguese: 'Portuguese.',
+          Dutch: 'Dutch.', Other: 'Another language or insufficient readable text.',
         },
       },
-      subject: { type: 'choice', instructions: 'Choose the most precise phrase for the document’s central subject, favoring specificity over broad themes.', criteria: subjectCriteria },
+      subject: { type: 'choice', instructions: 'Choose the most precise central subject.', criteria: subjectCriteria },
     },
   });
 

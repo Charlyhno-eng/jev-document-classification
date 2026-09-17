@@ -22,9 +22,9 @@ Configure a Vercel AI Gateway key in the application to start classifying.
 
 ## See JEV Document Classification in action
 
-![JEV Document Classification interface](assets/jev-doc-classification-interface.png)
+![JEV Document Classification interface](assets/jev-doc-classification-interface2.png)
 
-![JEV Document Classification example](assets/jev-doc-classification-test.png)
+![JEV Document Classification example](assets/jev-doc-classification-test2.png)
 
 ---
 
@@ -72,7 +72,7 @@ The **Undo** action restores that file to the selected root folder. If another f
 
 ## Faster, lower-cost classification
 
-Each document is reduced locally to a structured profile before JEV receives it. For long documents, the profile is capped at 6,000 characters and includes likely headings, locally extracted subject candidates, and representative excerpts from the beginning, middle, and end. Short documents keep their full text when that is already smaller than the profile limit. The original document text never leaves the local application beyond this bounded context.
+Each document is reduced locally to a structured profile before JEV receives it. For long documents, the profile is capped at 4,500 characters and includes likely headings, locally extracted subject candidates, and representative excerpts from the beginning, middle, and end. Short documents keep their full text when that is already smaller than the profile limit. The original document text never leaves the local application beyond this bounded context.
 
 Category, primary language, and precise subject already use one typed JEV evaluation request per document. The application processes up to 16 documents concurrently, so independent Vercel AI Gateway calls overlap while each document still moves only after its own request succeeds.
 
