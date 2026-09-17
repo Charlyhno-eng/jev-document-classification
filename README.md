@@ -26,6 +26,20 @@ Configure a Vercel AI Gateway key in the application to start classifying.
 
 ---
 
+## Getting your Vercel AI Gateway API key
+
+To use JEV, you need a Vercel account and an AI Gateway API key.
+
+1. Create a Vercel account or sign in at [Vercel](https://vercel.com).
+2. Open the [JEV model page on Vercel AI Gateway](https://vercel.com/ai-gateway/models/jev).
+3. Follow the instructions to enable AI Gateway and create an API key.
+4. Copy your API key and add it to the application configuration.
+5. Start the classification process.
+
+The API key is used to authenticate requests to JEV through Vercel AI Gateway.
+
+---
+
 ## Quickstart
 
 ### Install
