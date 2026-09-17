@@ -1,0 +1,41 @@
+{
+  "name": "jev-document-classification",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"tsx watch server/index.ts\"",
+    "dev:web": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build",
+    "start": "tsx server/index.ts",
+    "check": "tsc -b",
+    "test": "node --import tsx --test --test-concurrency=1 server/*.test.ts",
+    "test:coverage": "node --import tsx --test --test-concurrency=1 --experimental-test-coverage server/*.test.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "ai": "latest",
+    "cors": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "mammoth": "latest",
+    "pdfjs-dist": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router": "latest",
+    "tailwindcss": "latest"
+  },
+  "devDependencies": {
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "concurrently": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  }
+}

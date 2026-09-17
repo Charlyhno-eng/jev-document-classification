@@ -1,0 +1,5 @@
+[classification]
+categories = ["Finance","Doctoral thesis","Whitepaper"]
+
+[ai]
+api_key = ""

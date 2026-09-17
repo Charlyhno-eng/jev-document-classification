@@ -1,0 +1,24 @@
+export const NOT_PROCESSABLE_FOLDER = 'Not processable';
+
+const PLAIN_TEXT_EXTENSIONS = new Set([
+  'txt', 'md', 'csv', 'json', 'xml', 'html', 'htm', 'rtf', 'log', 'yaml', 'yml',
+]);
+
+export function extensionOf(fileName: string) {
+  const lastDot = fileName.lastIndexOf('.');
+  return lastDot > -1 ? fileName.slice(lastDot + 1).toLowerCase() : '';
+}
+
+export function isPlainTextDocument(fileName: string) {
+  return PLAIN_TEXT_EXTENSIONS.has(extensionOf(fileName));
+}
+
+export function isSupportedDocument(fileName: string) {
+  const extension = extensionOf(fileName);
+  return PLAIN_TEXT_EXTENSIONS.has(extension) || extension === 'pdf' || extension === 'docx';
+}
+
+export function unsupportedDocumentMessage(fileName: string) {
+  const extension = extensionOf(fileName);
+  return `.${extension || 'unknown'} files are not supported and were moved without being sent to JEV.`;
+}
