@@ -5,6 +5,7 @@ import {
 } from '../lib/api';
 import { readDocumentText } from '../lib/documents';
 import { listRootFiles, moveToCategory, restoreFromCategory } from '../lib/file-system';
+import { mapWithConcurrency } from '../lib/concurrency';
 import { buildLanguageBreakdown } from '../lib/run-metrics';
 import type { Classification, RunSummary } from '../types';
 import { extensionOf, isPreviewableImage, isSupportedDocument, NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER, unsupportedDocumentMessage } from '../../shared/document-policy';
@@ -14,6 +15,7 @@ export type SourceFolder =
   | { kind: 'server'; folderId: string; name: string; files: string[] };
 
 export type DocumentPreview = { title: string; kind: 'pdf' | 'image' | 'text'; url?: string; text?: string };
+const CLASSIFICATION_CONCURRENCY = 16;
 
 export function useDocumentClassification() {
   const [sourceFolder, setSourceFolder] = useState<SourceFolder | null>(null);
@@ -153,7 +155,8 @@ export function useDocumentClassification() {
         : (await listServerFolderFiles(folder.folderId)).files.map((name) => ({ name }));
       setFileCount(files.length);
       if (!files.length) throw new Error('This folder has no root-level files to classify.');
-      for (const item of files) {
+      const completed: Array<Classification | undefined> = Array(files.length);
+      await mapWithConcurrency(files, CLASSIFICATION_CONCURRENCY, async (item, index) => {
         setActiveFile(item.name);
         let record: Classification;
         try {
@@ -190,9 +193,10 @@ export function useDocumentClassification() {
         } catch (reason) {
           record = { id: crypto.randomUUID(), fileName: item.name, category: 'Not moved', language: '—', subject: '—', confidence: null, inputTokens: 0, cost: 0, moved: false, error: toMessage(reason) };
         }
-        processed = [...processed, record];
-        setResults(processed);
-      }
+        completed[index] = record;
+        processed = completed.filter((result): result is Classification => result !== undefined);
+        setResults([...processed]);
+      });
       const durationMs = performance.now() - startedAt;
       setSummary({ durationMs, totalCost: processed.reduce((sum, item) => sum + item.cost, 0), totalInputTokens: processed.reduce((sum, item) => sum + item.inputTokens, 0), completedAt: new Date() });
       const unprocessableCount = processed.filter((item) => item.unprocessable).length;

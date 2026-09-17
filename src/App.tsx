@@ -84,7 +84,7 @@ export function App() {
 
         <section className="run-panel mt-5">
           <div><p className="font-semibold text-white">Ready for a next-generation filing run</p><p className="mt-1 text-sm text-slate-400">Extract locally, identify a precise subject, classify with JEV, and move each document into place.</p></div>
-          <button type="button" className="button-primary" disabled={!model.sourceFolder || model.categories.length === 0 || !model.apiKeyConfigured || model.isRunning} onClick={model.runClassification}>{model.isRunning ? <LoaderCircle className="animate-spin" size={17} /> : <Play size={17} fill="currentColor" />}{model.isRunning ? `Classifying ${Math.min(model.results.length + 1, model.fileCount)}/${model.fileCount}` : 'Classify and organize'}<ChevronRight size={17} /></button>
+          <button type="button" className="button-primary" disabled={!model.sourceFolder || model.categories.length === 0 || !model.apiKeyConfigured || model.isRunning} onClick={model.runClassification}>{model.isRunning ? <LoaderCircle className="animate-spin" size={17} /> : <Play size={17} fill="currentColor" />}{model.isRunning ? `Classifying ${model.results.length}/${model.fileCount}` : 'Classify and organize'}<ChevronRight size={17} /></button>
         </section>
         {model.isRunning && model.activeFile && <p className="mt-3 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin text-[#14f195]" size={15} />Working on <span className="font-medium text-slate-300">{model.activeFile}</span></p>}
 
