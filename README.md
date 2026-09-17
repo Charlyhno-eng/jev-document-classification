@@ -1,40 +1,28 @@
-![JEV Document Classification banner](assets/jev-document-classification-banner.png)
+![JEV Document Classification banner](assets/jev-doc-classification-banner.png)
 
 # JEV Document Classification
 
 ---
 
-JEV Document Classification organizes a flat local folder into meaningful destinations.
-
-It extracts readable text from supported document formats directly on the user's machine.
-
-JEV assigns one configured category, a primary language, and a document-specific subject.
-
-The application is not multimodal: it processes readable text rather than images or other visual content.
-
-Files with unsupported, unsuitable, unreadable, or empty formats — such as image files — are automatically moved into a default **Not processable** folder.
-
-Readable documents are moved only after both text extraction and classification have successfully completed.
-
-Using JEV requires a Vercel account and an API credential created through the **Vercel AI Gateway**. This credential must be entered into the application to enable document classification.
-
-The Vercel AI Gateway credential is stored on the local server and is never returned to the browser.
-
-Categories and the Vercel AI Gateway credential are managed through the local application interface.
-
-The application can select local folders and organize their contents directly from the user's machine.
-
-Each run reports the classification decisions, processing duration, input token usage, and estimated API cost.
-
-JEV is designed for fast, low-cost, local-first document classification while keeping document processing and API credentials under the user's control.
+JEV Document Classification sorts documents from a selected folder into category subfolders.  
+It uses `typesafe-ai/jev`, an evaluation model from the `typesafe-ai` team, through Vercel AI Gateway.  
+JEV returns fast, typed classification decisions at very low cost.  
+Choose a folder and add the destination categories in the application.  
+The application extracts readable text from supported files before asking JEV to classify them.  
+JEV is not multimodal and cannot interpret images or other visual content.  
+Unsupported files and documents without extractable text go into a `Not processable` folder.  
+Readable documents move into subfolders matching the configured categories.  
+Each result includes a primary language and a precise subject, alongside its category.  
+Runs report processing time, input tokens, and estimated API cost.  
+Configure a Vercel AI Gateway key in the application to start classifying.
 
 ---
 
 ## See JEV Document Classification in action
 
-![JEV Document Classification interface](assets/jev-document-classification-interface.png)
+![JEV Document Classification interface](assets/jev-doc-classification1.png)
 
-![JEV Document Classification example](assets/jev-document-classification-example.png)
+![JEV Document Classification example](assets/jev-doc-classification2.png)
 
 ---
 
@@ -52,4 +40,4 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`, enter an AI Gateway API key in the interface, choose a folder, and start the classification run. The application creates `config/config.toml` automatically when it is missing.
+Open `http://localhost:5173`, enter a Vercel AI Gateway API key, choose a folder, and start classification. The application creates `config/config.toml` when it is missing.

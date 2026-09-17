@@ -6,6 +6,7 @@ import { classifyDocument } from './classification.js';
 import { readAppConfig, toPublicConfig, writeApiKey, writeCategories } from './config.js';
 import { chooseDirectory, listRootFileNames } from './documents.js';
 import { processLocalDocument } from './local-classification.js';
+import { fetchGatewayCredits } from './gateway-credits.js';
 import { isTrustedApiRequest, resolveRootFile } from './security.js';
 
 const port = Number(process.env.PORT ?? 8787);
@@ -56,6 +57,26 @@ app.put('/api/config/api-key', async (request, response) => {
     response.json({ configured: true });
   } catch (error) {
     response.status(400).json({ error: messageOf(error) });
+  }
+});
+
+app.post('/api/config/api-key/reveal', async (_request, response) => {
+  try {
+    const config = await readAppConfig();
+    if (!config.apiKey) throw new Error('Configure a Vercel AI Gateway API key first.');
+    response.json({ apiKey: config.apiKey });
+  } catch (error) {
+    response.status(404).json({ error: messageOf(error) });
+  }
+});
+
+app.get('/api/gateway/credits', async (_request, response) => {
+  try {
+    const config = await readAppConfig();
+    if (!config.apiKey) throw new Error('Configure a Vercel AI Gateway API key first.');
+    response.json({ balance: await fetchGatewayCredits(config.apiKey) });
+  } catch (error) {
+    response.status(503).json({ error: messageOf(error) });
   }
 });
 

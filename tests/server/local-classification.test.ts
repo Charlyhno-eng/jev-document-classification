@@ -3,10 +3,9 @@ import { access, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { processLocalDocument } from './local-classification.js';
-import { NOT_PROCESSABLE_FOLDER } from '../shared/document-policy.js';
-
-const config = { apiKey: 'gateway-key-' + 'x'.repeat(24), categories: ['Research'] };
+import { processLocalDocument } from '../../server/local-classification.js';
+import { NOT_PROCESSABLE_FOLDER } from '../../shared/document-policy.js';
+import { TEST_LOCAL_CLASSIFICATION_CONFIG as config } from '../helpers/fixtures.js';
 
 test('moves unsupported files to Not processable without calling JEV', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'jev-local-unsupported-'));

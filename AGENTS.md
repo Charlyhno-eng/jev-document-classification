@@ -18,9 +18,10 @@ All user-facing copy, source code, documentation, and comments must be written i
 ## Current implementation
 
 - The app is bootstrapped with `npm run dev`, which starts Vite on `5173` and the API server on `8787`.
-- `config/config.toml` stores categories and the AI Gateway API key. It is tracked at the user's request, created automatically when missing, and must never be exposed through API responses or logs.
+- `config/config.toml` stores categories and the AI Gateway API key. It is tracked at the user's request, created automatically when missing, and must never be exposed through logs.
 - `config/config.example.toml` documents the safe configuration shape without containing a credential.
-- The interface can replace the API key but never reads the saved value back into the browser; it receives only a configured/not-configured status.
+- The interface can reveal the saved API key only after the user explicitly opens Gateway settings. It is returned by a local, marker-protected POST route, masked by default, and cleared from browser state when settings close.
+- The interface may display the AI Gateway credit balance through Vercel's read-only `/v1/credits` endpoint. Treat it as best-effort because Vercel does not document it as a stable public contract; balance failures must never block classification.
 - The server exposes `POST /api/classify`. It reads categories and the API key exclusively from `config/config.toml`, then sends document text to JEV as three typed choice questions in one evaluation request.
 - JEV's listed input pricing is currently represented in `server/classification.ts` as `$0.04` per one million input tokens. Keep this value in sync with the provider's official pricing when updating the project.
 - The API key must never be read from `.env` or any environment variable. `config/config.toml` is the sole credential source.
@@ -30,7 +31,7 @@ All user-facing copy, source code, documentation, and comments must be written i
 
 ## Working conventions
 
-- Keep the API key server-side. Never create a `VITE_` environment variable for it, return it to the client, or log it.
+- Never create a `VITE_` environment variable for the API key or log it. The only permitted client exposure is the explicit, user-initiated local settings reveal flow; clear the key from browser state when settings close.
 - Preserve the dark, high-performance visual identity: near-black surfaces, restrained green/purple gradients, large typography, and subtle motion that respects `prefers-reduced-motion`.
 - Preserve the local-first flow: the user must explicitly choose the directory, and the browser must retain the permission needed to move files.
 - Move a supported document into its chosen category only after text extraction and the JEV request both succeed. Move unsupported, unreadable, or empty documents into the reserved `Not processable` folder without sending them to JEV. Gateway failures must leave the source file untouched. Do not overwrite an existing destination file; create a numbered filename instead.

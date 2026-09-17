@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractSubjectCandidates } from './subject.js';
+import { extractSubjectCandidates } from '../../server/subject.js';
 
 test('extracts a precise thesis topic instead of a broad fixed domain', () => {
   const text = `Cryptocurrency Microsystems for Decentralized Finance

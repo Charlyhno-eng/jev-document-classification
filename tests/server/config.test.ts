@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, stat, symlink, writeFile } from 'node:fs/prom
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { ConfigStore, parseConfig, serializeConfig, toPublicConfig, validateCategories } from './config.js';
+import { ConfigStore, parseConfig, serializeConfig, toPublicConfig, validateCategories } from '../../server/config.js';
 
 test('parses and serializes categories and the API key without data loss', () => {
   const config = { categories: ['Finance', 'Doctoral thesis'], apiKey: 'secret-key-' + 'x'.repeat(24) };

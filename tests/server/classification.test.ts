@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { classifyDocument, PRICE_PER_MILLION_INPUT_TOKENS, type EvaluationRunner } from './classification.js';
+import { classifyDocument, PRICE_PER_MILLION_INPUT_TOKENS, type EvaluationRunner } from '../../server/classification.js';
+import { TEST_GATEWAY_API_KEY } from '../helpers/fixtures.js';
 
 const input = {
-  apiKey: 'gateway-key-' + 'x'.repeat(24),
+  apiKey: TEST_GATEWAY_API_KEY,
   fileName: 'thesis.pdf',
   text: 'Cryptocurrency Microsystems for Decentralized Finance\nA thesis about secure hardware wallets and blockchain microarchitectures.',
   categories: ['Doctoral thesis', 'Whitepaper'],
@@ -34,6 +35,6 @@ test('rejects invented subjects and invalid usage from the provider', async () =
 });
 
 test('does not request the paid Zero Data Retention Gateway option', async () => {
-  const source = await readFile(new URL('./classification.ts', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../../server/classification.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /zeroDataRetention|zero_data_retention/i);
 });

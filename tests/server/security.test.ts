@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
-import { isTrustedApiRequest, resolveCategoryDirectory, resolveRootFile, validateApiKey, validateCategoryName } from './security.js';
+import { isTrustedApiRequest, resolveCategoryDirectory, resolveRootFile, validateApiKey, validateCategoryName } from '../../server/security.js';
 
 test('accepts safe category names and rejects traversal or cross-platform reserved names', () => {
   assert.equal(validateCategoryName('Doctoral thesis'), 'Doctoral thesis');

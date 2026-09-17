@@ -10,8 +10,8 @@
     "build": "tsc -b && vite build",
     "start": "tsx server/index.ts",
     "check": "tsc -b",
-    "test": "node --import tsx --test --test-concurrency=1 server/*.test.ts",
-    "test:coverage": "node --import tsx --test --test-concurrency=1 --experimental-test-coverage server/*.test.ts"
+    "test": "node --import tsx --test --test-concurrency=1 tests/server/*.test.ts",
+    "test:coverage": "node --import tsx --test --test-concurrency=1 --experimental-test-coverage tests/server/*.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "latest",

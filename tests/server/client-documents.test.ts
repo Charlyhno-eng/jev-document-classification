@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { listRootFiles, moveToCategory } from '../src/lib/file-system.js';
+import { listRootFiles, moveToCategory } from '../../src/lib/file-system.js';
 
 test('browser file listing ignores directories and sorts names', async () => {
   const entries = [

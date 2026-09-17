@@ -15,12 +15,20 @@ export async function loadConfig() {
   return request<{ categories: string[]; apiKeyConfigured: boolean }>('/api/config');
 }
 
+export async function loadGatewayCredits() {
+  return request<{ balance: number }>('/api/gateway/credits');
+}
+
 export async function updateCategories(categories: string[]) {
   return request<{ categories: string[] }>('/api/config/categories', { method: 'PUT', body: JSON.stringify({ categories }) });
 }
 
 export async function updateApiKey(apiKey: string) {
   return request<{ configured: boolean }>('/api/config/api-key', { method: 'PUT', body: JSON.stringify({ apiKey }) });
+}
+
+export async function revealApiKey() {
+  return request<{ apiKey: string }>('/api/config/api-key/reveal', { method: 'POST' });
 }
 
 export async function selectServerFolder() {

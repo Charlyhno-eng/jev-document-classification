@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  classifyExtractedDocument, classifyServerDocument, loadConfig, selectServerFolder,
+  classifyExtractedDocument, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectServerFolder,
   updateApiKey, updateCategories,
 } from '../lib/api';
 import { readDocumentText } from '../lib/documents';
@@ -18,6 +18,7 @@ export function useDocumentClassification() {
   const [newCategory, setNewCategory] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [gatewayCredits, setGatewayCredits] = useState<number | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingApiKey, setIsSavingApiKey] = useState(false);
@@ -40,6 +41,7 @@ export function useDocumentClassification() {
     void loadConfig().then((config) => {
       setCategories(config.categories);
       setApiKeyConfigured(config.apiKeyConfigured);
+      if (config.apiKeyConfigured) void refreshGatewayCredits();
     }).catch((reason) => setError(toMessage(reason))).finally(() => setConfigLoaded(true));
   }, []);
 
@@ -118,6 +120,7 @@ export function useDocumentClassification() {
       setApiKey('');
       setShowApiKey(false);
       setApiKeyConfigured(true);
+      void refreshGatewayCredits();
       setError(null);
       setNotice('Vercel AI Gateway API key saved in config/config.toml.');
       return true;
@@ -189,14 +192,41 @@ export function useDocumentClassification() {
     } finally {
       setActiveFile('');
       setIsRunning(false);
+      void refreshGatewayCredits();
     }
   }
 
+  async function refreshGatewayCredits() {
+    try {
+      const result = await loadGatewayCredits();
+      setGatewayCredits(result.balance);
+    } catch {
+      setGatewayCredits(null);
+    }
+  }
+
+  async function loadSavedApiKey() {
+    if (!apiKeyConfigured) return;
+    try {
+      const result = await revealApiKey();
+      setApiKey(result.apiKey);
+      setError(null);
+    } catch (reason) {
+      setError(toMessage(reason));
+    }
+  }
+
+  function clearApiKeyInput() {
+    setApiKey('');
+    setShowApiKey(false);
+  }
+
   return {
-    sourceFolder, categories, newCategory, setNewCategory, apiKey, setApiKey, apiKeyConfigured, configLoaded,
+    sourceFolder, categories, newCategory, setNewCategory, apiKey, setApiKey, apiKeyConfigured, gatewayCredits, configLoaded,
     showApiKey, setShowApiKey, isSavingApiKey, isSavingCategories, results, summary, fileCount,
     isRunning, activeFile, notice, error, totalCost, totalTokens, classified, languageBreakdown,
-    categoryBreakdown, selectFolder, addCategory, removeCategory, saveApiKey, runClassification,
+    categoryBreakdown, selectFolder, addCategory, removeCategory, saveApiKey, runClassification, refreshGatewayCredits,
+    loadSavedApiKey, clearApiKeyInput,
   };
 }
 
