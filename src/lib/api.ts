@@ -1,12 +1,15 @@
 export type ClassificationApiResult = {
   category: string;
   categoryConfidence: number | null;
+  destinationCategory: string;
+  needsReview: boolean;
   language: string;
   subject: string;
   usage: { inputTokens?: number };
   cost: number;
   unprocessable?: boolean;
   note?: string;
+  movedFileName?: string;
 };
 
 type ErrorPayload = { error?: string };
@@ -43,6 +46,24 @@ export function classifyExtractedDocument(fileName: string, text: string) {
 
 export function classifyServerDocument(folderId: string, fileName: string) {
   return request<ClassificationApiResult>(`/api/folders/${encodeURIComponent(folderId)}/classify`, { method: 'POST', body: JSON.stringify({ fileName }) });
+}
+
+export function undoServerMove(folderId: string, category: string, fileName: string) {
+  return request<{ fileName: string }>(`/api/folders/${encodeURIComponent(folderId)}/undo`, { method: 'POST', body: JSON.stringify({ category, fileName }) });
+}
+
+export function listServerFolderFiles(folderId: string) {
+  return request<{ files: string[] }>(`/api/folders/${encodeURIComponent(folderId)}/files`);
+}
+
+export async function loadServerPreview(folderId: string, category: string, fileName: string) {
+  const response = await fetch(`/api/folders/${encodeURIComponent(folderId)}/preview/${encodeURIComponent(category)}/${encodeURIComponent(fileName)}`, { headers: clientHeaders() });
+  if (!response.ok) {
+    const data = await response.json() as ErrorPayload;
+    throw new Error(data.error ?? 'The document preview could not be loaded.');
+  }
+  const contentType = response.headers.get('Content-Type') ?? '';
+  return { blob: await response.blob(), isPdf: contentType.includes('application/pdf'), isImage: contentType.startsWith('image/') };
 }
 
 async function request<T>(url: string, init: RequestInit = {}) {

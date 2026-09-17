@@ -27,6 +27,7 @@ test('validates category count, uniqueness, and folder safety', () => {
   assert.throws(() => validateCategories([]));
   assert.throws(() => validateCategories(['Finance', 'finance']));
   assert.throws(() => validateCategories(['Not processable']), /reserved/);
+  assert.throws(() => validateCategories(['Need review']), /reserved/);
   assert.throws(() => validateCategories(['../escape']));
   assert.throws(() => validateCategories(Array.from({ length: 51 }, (_, index) => `Category ${index}`)));
 });

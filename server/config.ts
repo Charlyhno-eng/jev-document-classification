@@ -2,7 +2,7 @@ import { chmod, lstat, mkdir, readFile, realpath, rename, writeFile } from 'node
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { validateApiKey, validateCategoryName } from './security.js';
-import { NOT_PROCESSABLE_FOLDER } from '../shared/document-policy.js';
+import { NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER } from '../shared/document-policy.js';
 
 export type AppConfig = { categories: string[]; apiKey: string };
 export const DEFAULT_CONFIG: AppConfig = { categories: ['Finance', 'Legal', 'Operations'], apiKey: '' };
@@ -87,8 +87,9 @@ export function validateCategories(value: unknown) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 50) throw new Error('Provide between 1 and 50 categories.');
   const categories = value.map(validateCategoryName);
   if (new Set(categories.map((category) => category.toLocaleLowerCase())).size !== categories.length) throw new Error('Category names must be unique.');
-  if (categories.some((category) => category.toLocaleLowerCase() === NOT_PROCESSABLE_FOLDER.toLocaleLowerCase())) {
-    throw new Error(`“${NOT_PROCESSABLE_FOLDER}” is reserved for files that cannot be classified.`);
+  const reservedFolders = [NOT_PROCESSABLE_FOLDER, NEED_REVIEW_FOLDER];
+  if (categories.some((category) => reservedFolders.some((reserved) => category.toLocaleLowerCase() === reserved.toLocaleLowerCase()))) {
+    throw new Error(`“${NOT_PROCESSABLE_FOLDER}” and “${NEED_REVIEW_FOLDER}” are reserved folders.`);
   }
   return categories;
 }

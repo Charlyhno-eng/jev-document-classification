@@ -17,6 +17,18 @@ export async function moveToCategory(root: FileSystemDirectoryHandle, source: Fi
   return destinationName;
 }
 
+export async function restoreFromCategory(root: FileSystemDirectoryHandle, category: string, fileName: string) {
+  const sourceDirectory = await root.getDirectoryHandle(category);
+  const source = await sourceDirectory.getFileHandle(fileName);
+  const destinationName = await availableFileName(root, fileName);
+  const target = await root.getFileHandle(destinationName, { create: true });
+  const writer = await target.createWritable();
+  await writer.write(await source.getFile());
+  await writer.close();
+  await sourceDirectory.removeEntry(fileName);
+  return destinationName;
+}
+
 async function availableFileName(directory: FileSystemDirectoryHandle, originalName: string) {
   const lastDot = originalName.lastIndexOf('.');
   const stem = lastDot > 0 ? originalName.slice(0, lastDot) : originalName;

@@ -2,12 +2,14 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import cors from 'cors';
 import express from 'express';
+import { readFile } from 'node:fs/promises';
 import { classifyDocument } from './classification.js';
 import { readAppConfig, toPublicConfig, writeApiKey, writeCategories } from './config.js';
-import { chooseDirectory, listRootFileNames } from './documents.js';
+import { categoryDocumentPath, chooseDirectory, listRootFileNames, readDocumentText, restoreFileFromCategory } from './documents.js';
 import { processLocalDocument } from './local-classification.js';
 import { fetchGatewayCredits } from './gateway-credits.js';
 import { isTrustedApiRequest, resolveRootFile } from './security.js';
+import { extensionOf, isPreviewableImage } from '../shared/document-policy.js';
 
 const port = Number(process.env.PORT ?? 8787);
 const folderSessions = new Map<string, string>();
@@ -125,6 +127,59 @@ app.post('/api/folders/:folderId/classify', async (request, response) => {
     response.status(422).json({ error: messageOf(error) });
   }
 });
+
+app.get('/api/folders/:folderId/files', async (request, response) => {
+  const directoryPath = folderSessions.get(request.params.folderId);
+  if (!directoryPath) {
+    response.status(404).json({ error: 'This folder session has expired. Select the folder again.' });
+    return;
+  }
+  try {
+    response.json({ files: await listRootFileNames(directoryPath) });
+  } catch (error) {
+    response.status(422).json({ error: messageOf(error) });
+  }
+});
+
+app.post('/api/folders/:folderId/undo', async (request, response) => {
+  const directoryPath = folderSessions.get(request.params.folderId);
+  if (!directoryPath) {
+    response.status(404).json({ error: 'This folder session has expired. Select the folder again.' });
+    return;
+  }
+  try {
+    const { category, fileName } = request.body as { category?: unknown; fileName?: unknown };
+    if (typeof category !== 'string' || typeof fileName !== 'string') throw new Error('A category and file name are required.');
+    response.json({ fileName: await restoreFileFromCategory(directoryPath, category, fileName) });
+  } catch (error) {
+    response.status(422).json({ error: messageOf(error) });
+  }
+});
+
+app.get('/api/folders/:folderId/preview/:category/:fileName', async (request, response) => {
+  const directoryPath = folderSessions.get(request.params.folderId);
+  if (!directoryPath) {
+    response.status(404).json({ error: 'This folder session has expired. Select the folder again.' });
+    return;
+  }
+  try {
+    const documentPath = await categoryDocumentPath(directoryPath, request.params.category, request.params.fileName);
+    const extension = extensionOf(request.params.fileName);
+    if (extension === 'pdf' || isPreviewableImage(request.params.fileName)) {
+      response.type(previewMimeType(extension)).send(await readFile(documentPath));
+      return;
+    }
+    response.type('text/plain').send(await readDocumentText(documentPath));
+  } catch (error) {
+    response.status(422).json({ error: messageOf(error) });
+  }
+});
+
+function previewMimeType(extension: string) {
+  if (extension === 'pdf') return 'application/pdf';
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+  return `image/${extension}`;
+}
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : 'An unexpected error occurred.';

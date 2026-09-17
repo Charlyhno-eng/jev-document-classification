@@ -1,4 +1,10 @@
 export const NOT_PROCESSABLE_FOLDER = 'Not processable';
+export const NEED_REVIEW_FOLDER = 'Need review';
+export const CATEGORY_CONFIDENCE_THRESHOLD = 0.75;
+
+export function needsReview(confidence: number | null) {
+  return confidence !== null && confidence < CATEGORY_CONFIDENCE_THRESHOLD;
+}
 
 const PLAIN_TEXT_EXTENSIONS = new Set([
   'txt', 'md', 'csv', 'json', 'xml', 'html', 'htm', 'rtf', 'log', 'yaml', 'yml',
@@ -16,6 +22,10 @@ export function isPlainTextDocument(fileName: string) {
 export function isSupportedDocument(fileName: string) {
   const extension = extensionOf(fileName);
   return PLAIN_TEXT_EXTENSIONS.has(extension) || extension === 'pdf' || extension === 'docx';
+}
+
+export function isPreviewableImage(fileName: string) {
+  return new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']).has(extensionOf(fileName));
 }
 
 export function unsupportedDocumentMessage(fileName: string) {

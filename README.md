@@ -13,6 +13,8 @@ JEV is not multimodal and cannot interpret images or other visual content.
 Unsupported files and documents without extractable text go into a `Not processable` folder.  
 Readable documents move into subfolders matching the configured categories.  
 Each result includes a primary language and a precise subject, alongside its category.  
+The audit also shows JEV's category confidence. Documents below 75% confidence move to `Need review`, while retaining JEV's suggested category for review.
+The audit can preview a moved PDF, readable document, or common image in the browser, and restore an individual file to the source folder.
 Runs report processing time, input tokens, and estimated API cost.  
 Configure a Vercel AI Gateway key in the application to start classifying.
 
@@ -55,3 +57,15 @@ npm run dev
 ```
 
 Open `http://localhost:5173`, enter a Vercel AI Gateway API key, choose a folder, and start classification. The application creates `config/config.toml` when it is missing.
+
+## Confidence and review queue
+
+JEV supplies a probability for its selected category when the provider returns one. The application sends a document to `Need review` when that probability is below `0.75`. The audit records both the actual destination and the category JEV originally suggested, so a reviewer can quickly decide where it belongs.
+
+If a probability is unavailable, the audit displays `Unavailable` and the document is filed in JEV's selected category. `Need review` and `Not processable` are reserved folder names and cannot be added as regular categories.
+
+## Preview and undo
+
+Each moved file has a **View** action in the run audit. PDFs render directly in the browser; DOCX and supported text documents render their extracted text; PNG, JPEG, GIF, and WebP images render as images. The preview is local to the selected folder session.
+
+The **Undo** action restores that file to the selected root folder. If another file already uses the original name, the restored file receives a numbered name such as `report (1).pdf`; no file is overwritten.

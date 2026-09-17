@@ -99,6 +99,37 @@ export async function moveFileToCategory(directoryPath: string, fileName: string
   throw new Error(`Could not find a free destination name for ${fileName}.`);
 }
 
+export async function restoreFileFromCategory(directoryPath: string, category: string, fileName: string) {
+  const sourceDirectory = resolveCategoryDirectory(directoryPath, category);
+  const sourcePath = resolveRootFile(sourceDirectory, fileName);
+  await assertRegularFile(sourcePath);
+  const rootPath = await realpath(directoryPath);
+  const sourceDirectoryPath = await realpath(sourceDirectory);
+  if (path.dirname(sourceDirectoryPath) !== rootPath) throw new Error('The source folder escapes the selected root.');
+  const { name, ext } = path.parse(fileName);
+
+  for (let index = 0; index < 1_000; index += 1) {
+    const candidate = index === 0 ? fileName : `${name} (${index})${ext}`;
+    try {
+      await copyFile(sourcePath, path.join(rootPath, candidate), constants.COPYFILE_EXCL);
+      await unlink(sourcePath);
+      return candidate;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error(`Could not find a free root-level name for ${fileName}.`);
+}
+
+export async function categoryDocumentPath(directoryPath: string, category: string, fileName: string) {
+  const categoryDirectory = resolveCategoryDirectory(directoryPath, category);
+  const filePath = resolveRootFile(categoryDirectory, fileName);
+  const [realRoot, realCategory] = await Promise.all([realpath(directoryPath), realpath(categoryDirectory)]);
+  if (path.dirname(realCategory) !== realRoot) throw new Error('The document folder escapes the selected root.');
+  await assertRegularFile(filePath);
+  return filePath;
+}
+
 async function assertRegularFile(filePath: string) {
   const stats = await lstat(filePath);
   if (!stats.isFile() || stats.isSymbolicLink()) throw new Error('Only regular files can be processed.');

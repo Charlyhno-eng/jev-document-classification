@@ -5,6 +5,10 @@ export type Classification = {
   language: string;
   subject: string;
   confidence: number | null;
+  suggestedCategory?: string;
+  destinationFileName?: string;
+  needsReview?: boolean;
+  undone?: boolean;
   inputTokens: number;
   cost: number;
   moved: boolean;

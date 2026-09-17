@@ -3,7 +3,7 @@ import { access, mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/pr
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { listRootFileNames, moveFileToCategory, readDocumentText, safeRootFile } from '../../server/documents.js';
+import { listRootFileNames, moveFileToCategory, readDocumentText, restoreFileFromCategory, safeRootFile } from '../../server/documents.js';
 import { isSupportedDocument } from '../../shared/document-policy.js';
 import { createPdf } from '../helpers/pdf.js';
 
@@ -53,6 +53,16 @@ test('moves without overwriting an existing destination file', async () => {
   assert.equal(await readFile(path.join(root, 'Research', 'paper.txt'), 'utf8'), 'existing document');
   assert.equal(await readFile(path.join(root, 'Research', destinationName), 'utf8'), 'new document');
   await assert.rejects(() => access(path.join(root, 'paper.txt')));
+});
+
+test('restores a moved file to the root without overwriting a new file', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'jev-restore-'));
+  await mkdir(path.join(root, 'Research'));
+  await writeFile(path.join(root, 'Research', 'paper.txt'), 'moved document');
+  await writeFile(path.join(root, 'paper.txt'), 'new root document');
+  const restoredName = await restoreFileFromCategory(root, 'Research', 'paper.txt');
+  assert.equal(restoredName, 'paper (1).txt');
+  assert.equal(await readFile(path.join(root, restoredName), 'utf8'), 'moved document');
 });
 
 test('rejects source and destination symlinks that could escape the selected folder', async () => {

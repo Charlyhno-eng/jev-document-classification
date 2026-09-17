@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { processLocalDocument } from '../../server/local-classification.js';
 import { NOT_PROCESSABLE_FOLDER } from '../../shared/document-policy.js';
+import { NEED_REVIEW_FOLDER } from '../../shared/document-policy.js';
 import { TEST_LOCAL_CLASSIFICATION_CONFIG as config } from '../helpers/fixtures.js';
 
 test('moves unsupported files to Not processable without calling JEV', async () => {
@@ -48,7 +49,7 @@ test('moves a successfully classified document into its selected category', asyn
   const result = await processLocalDocument(root, 'paper.txt', config, {
     extract: async () => 'A precise paper about secure wallet microsystems.',
     classify: async () => ({
-      category: 'Research', categoryConfidence: 0.9, language: 'English', subject: 'Secure wallet microsystems',
+      category: 'Research', destinationCategory: 'Research', needsReview: false, categoryConfidence: 0.9, language: 'English', subject: 'Secure wallet microsystems',
       usage: { inputTokens: 25 }, cost: 0.000001,
     }),
   });
@@ -64,4 +65,18 @@ test('leaves the source file untouched when Gateway classification fails', async
     classify: async () => { throw new Error('Gateway unavailable'); },
   }), /Gateway unavailable/);
   assert.equal(await readFile(path.join(root, 'paper.txt'), 'utf8'), 'document');
+});
+
+test('moves a low-confidence classification into Need review', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'jev-local-review-'));
+  await writeFile(path.join(root, 'paper.txt'), 'document');
+  const result = await processLocalDocument(root, 'paper.txt', config, {
+    extract: async () => 'Readable document',
+    classify: async () => ({
+      category: 'Research', destinationCategory: NEED_REVIEW_FOLDER, needsReview: true, categoryConfidence: 0.6,
+      language: 'English', subject: 'Readable document', usage: { inputTokens: 2 }, cost: 0,
+    }),
+  });
+  assert.equal(result.destinationCategory, NEED_REVIEW_FOLDER);
+  assert.equal(await readFile(path.join(root, NEED_REVIEW_FOLDER, 'paper.txt'), 'utf8'), 'document');
 });

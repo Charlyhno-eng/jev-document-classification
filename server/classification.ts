@@ -1,5 +1,6 @@
 import { createGateway, experimental_evaluate as evaluate } from 'ai';
 import { extractSubjectCandidates } from './subject.js';
+import { NEED_REVIEW_FOLDER, needsReview } from '../shared/document-policy.js';
 
 export const PRICE_PER_MILLION_INPUT_TOKENS = 0.04;
 
@@ -33,6 +34,8 @@ export async function classifyDocument(
   return {
     category: decision.category,
     categoryConfidence: decision.categoryConfidence,
+    destinationCategory: needsReview(decision.categoryConfidence) ? NEED_REVIEW_FOLDER : decision.category,
+    needsReview: needsReview(decision.categoryConfidence),
     language: decision.language,
     subject: decision.subject,
     usage: { inputTokens: decision.inputTokens },

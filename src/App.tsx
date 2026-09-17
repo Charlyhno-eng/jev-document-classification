@@ -4,6 +4,7 @@ import {
   KeyRound, LoaderCircle, LockKeyhole, Play, Settings,
   Trash2, TriangleAlert, WalletCards, XCircle, Zap,
 } from 'lucide-react';
+import { DocumentPreview } from './components/DocumentPreview';
 import { GatewaySettings } from './components/GatewaySettings';
 import { RunDashboard } from './components/RunDashboard';
 import { useDocumentClassification } from './hooks/useDocumentClassification';
@@ -87,7 +88,7 @@ export function App() {
         </section>
         {model.isRunning && model.activeFile && <p className="mt-3 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin text-[#14f195]" size={15} />Working on <span className="font-medium text-slate-300">{model.activeFile}</span></p>}
 
-        {(model.results.length > 0 || model.summary) && <RunDashboard results={model.results} summary={model.summary} totalCost={model.totalCost} totalTokens={model.totalTokens} classified={model.classified} languageBreakdown={model.languageBreakdown} categoryBreakdown={model.categoryBreakdown} />}
+        {(model.results.length > 0 || model.summary) && <RunDashboard results={model.results} summary={model.summary} totalCost={model.totalCost} totalTokens={model.totalTokens} classified={model.classified} languageBreakdown={model.languageBreakdown} categoryBreakdown={model.categoryBreakdown} onPreview={model.previewDocument} onUndo={model.undoMove} undoingId={model.undoingId} />}
         </>}
       </div>
 
@@ -103,6 +104,7 @@ export function App() {
         onClose={() => { setSettingsOpen(false); model.clearApiKeyInput(); }}
         onSave={async () => { if (await model.saveApiKey()) setSettingsOpen(false); }}
       />
+      <DocumentPreview preview={model.preview} onClose={model.closePreview} />
     </main>
   );
 }

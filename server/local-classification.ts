@@ -16,12 +16,15 @@ type LocalClassificationDependencies = {
 export type LocalClassificationResult = {
   category: string;
   categoryConfidence: number | null;
+  destinationCategory: string;
+  needsReview: boolean;
   language: string;
   subject: string;
   usage: { inputTokens: number };
   cost: number;
   unprocessable?: boolean;
   note?: string;
+  movedFileName: string;
 };
 
 export async function processLocalDocument(
@@ -50,8 +53,8 @@ export async function processLocalDocument(
   }
 
   const result = await classify({ fileName, text: extractedText, categories: config.categories, apiKey: config.apiKey });
-  await move(directoryPath, fileName, result.category);
-  return result;
+  const movedFileName = await move(directoryPath, fileName, result.destinationCategory);
+  return { ...result, movedFileName };
 }
 
 async function moveToNotProcessable(
@@ -60,16 +63,19 @@ async function moveToNotProcessable(
   note: string,
   move: typeof moveFileToCategory,
 ): Promise<LocalClassificationResult> {
-  await move(directoryPath, fileName, NOT_PROCESSABLE_FOLDER);
+  const movedFileName = await move(directoryPath, fileName, NOT_PROCESSABLE_FOLDER);
   return {
     category: NOT_PROCESSABLE_FOLDER,
     categoryConfidence: null,
+    destinationCategory: NOT_PROCESSABLE_FOLDER,
+    needsReview: false,
     language: '—',
     subject: '—',
     usage: { inputTokens: 0 },
     cost: 0,
     unprocessable: true,
     note,
+    movedFileName,
   };
 }
 
