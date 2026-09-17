@@ -5,6 +5,7 @@ import {
 } from '../lib/api';
 import { readDocumentText } from '../lib/documents';
 import { listRootFiles, moveToCategory } from '../lib/file-system';
+import { buildLanguageBreakdown } from '../lib/run-metrics';
 import type { Classification, RunSummary } from '../types';
 import { isSupportedDocument, NOT_PROCESSABLE_FOLDER, unsupportedDocumentMessage } from '../../shared/document-policy';
 
@@ -34,7 +35,7 @@ export function useDocumentClassification() {
   const totalCost = useMemo(() => results.reduce((sum, item) => sum + item.cost, 0), [results]);
   const totalTokens = useMemo(() => results.reduce((sum, item) => sum + item.inputTokens, 0), [results]);
   const classified = results.filter((item) => item.moved && !item.unprocessable).length;
-  const languageBreakdown = useMemo(() => countBy(results, (item) => item.language), [results]);
+  const languageBreakdown = useMemo(() => buildLanguageBreakdown(results), [results]);
   const categoryBreakdown = useMemo(() => countBy(results, (item) => item.category), [results]);
 
   useEffect(() => {
