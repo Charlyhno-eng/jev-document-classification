@@ -30,7 +30,7 @@ JEV is designed for fast, low-cost, local-first document classification while ke
 
 ---
 
-## See T.A.R.S. in action
+## See JEV Document Classification in action
 
 ![JEV Document Classification interface](assets/jev-document-classification-interface.png)
 
