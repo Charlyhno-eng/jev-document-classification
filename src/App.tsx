@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2, ChevronRight, CircleHelp, DollarSign, FolderOpen, FolderPlus,
   KeyRound, LoaderCircle, LockKeyhole, Play, Settings,
@@ -15,6 +15,23 @@ const formatCredits = (value: number) => `$${value < 1 ? value.toFixed(4) : valu
 export function App() {
   const model = useDocumentClassification();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const dashboardAnchor = useRef<HTMLDivElement>(null);
+  const hasScrolledToRunDashboard = useRef(false);
+
+  useEffect(() => {
+    if (!model.isRunning) {
+      hasScrolledToRunDashboard.current = false;
+      return;
+    }
+    if (model.results.length > 0 && !hasScrolledToRunDashboard.current) {
+      hasScrolledToRunDashboard.current = true;
+      dashboardAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [model.isRunning, model.results.length]);
+
+  function startRun() {
+    void model.runClassification();
+  }
 
   return (
     <main className="app-shell min-h-screen text-white">
@@ -39,7 +56,7 @@ export function App() {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto max-w-[92rem] px-6 pb-16 pt-14 sm:pt-20">
+      <div className="relative z-10 mx-auto max-w-[92rem] px-6 pb-40 pt-14 sm:pt-20">
         <section className="mx-auto mb-14 max-w-4xl text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold uppercase tracking-[.18em] text-[#14f195]"><Zap size={14} />JEV-powered intelligence</div>
           <h1 className="hero-title text-5xl font-bold tracking-[-.055em] sm:text-7xl lg:text-8xl">Next-generation<br /><span>document classification.</span></h1>
@@ -84,11 +101,12 @@ export function App() {
 
         <section className="run-panel mt-5">
           <div><p className="font-semibold text-white">Ready for a next-generation filing run</p><p className="mt-1 text-sm text-slate-400">Extract locally, identify a precise subject, classify with JEV, and move each document into place.</p></div>
-          <button type="button" className="button-primary" disabled={!model.sourceFolder || model.categories.length === 0 || !model.apiKeyConfigured || model.isRunning} onClick={model.runClassification}>{model.isRunning ? <LoaderCircle className="animate-spin" size={17} /> : <Play size={17} fill="currentColor" />}{model.isRunning ? `Classifying ${model.results.length}/${model.fileCount}` : 'Classify and organize'}<ChevronRight size={17} /></button>
+          <button type="button" className="button-primary" disabled={!model.sourceFolder || model.categories.length === 0 || !model.apiKeyConfigured || model.isRunning} onClick={startRun}>{model.isRunning ? <LoaderCircle className="animate-spin" size={17} /> : <Play size={17} fill="currentColor" />}{model.isRunning ? `Classifying ${model.results.length}/${model.fileCount}` : 'Classify and organize'}<ChevronRight size={17} /></button>
         </section>
+        <div ref={dashboardAnchor} className="dashboard-anchor" />
         {model.isRunning && model.activeFile && <p className="mt-3 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin text-[#14f195]" size={15} />Working on <span className="font-medium text-slate-300">{model.activeFile}</span></p>}
 
-        {(model.results.length > 0 || model.summary) && <RunDashboard results={model.results} summary={model.summary} totalCost={model.totalCost} totalTokens={model.totalTokens} classified={model.classified} languageBreakdown={model.languageBreakdown} categoryBreakdown={model.categoryBreakdown} performance={model.performance} onPreview={model.previewDocument} onUndo={model.undoMove} undoingId={model.undoingId} />}
+        {(model.results.length > 0 || model.summary) && <RunDashboard results={model.results} summary={model.summary} totalCost={model.totalCost} totalTokens={model.totalTokens} classified={model.classified} categoryBreakdown={model.categoryBreakdown} performance={model.performance} onPreview={model.previewDocument} onUndo={model.undoMove} undoingId={model.undoingId} />}
         </>}
       </div>
 
@@ -103,6 +121,10 @@ export function App() {
         onToggleVisibility={() => model.setShowApiKey((current) => !current)}
         onClose={() => { setSettingsOpen(false); model.clearApiKeyInput(); }}
         onSave={async () => { if (await model.saveApiKey()) setSettingsOpen(false); }}
+        sourceFolderPath={model.sourceFolderPath}
+        savingSourceFolderPath={model.isSavingSourceFolderPath}
+        onSourceFolderPathChange={model.setSourceFolderPath}
+        onSaveSourceFolderPath={model.saveSourceFolderPath}
       />
       <DocumentPreview preview={model.preview} onClose={model.closePreview} />
     </main>

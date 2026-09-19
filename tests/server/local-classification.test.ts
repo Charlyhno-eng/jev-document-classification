@@ -49,7 +49,7 @@ test('moves a successfully classified document into its selected category', asyn
   const result = await processLocalDocument(root, 'paper.txt', config, {
     extract: async () => 'A precise paper about secure wallet microsystems.',
     classify: async () => ({
-      category: 'Research', destinationCategory: 'Research', needsReview: false, categoryConfidence: 0.9, language: 'English', subject: 'Secure wallet microsystems',
+      category: 'Research', destinationCategory: 'Research', needsReview: false, categoryConfidence: 0.9, confidentiality: 'Internal', promptInjectionScore: 0, promptInjectionRisk: false, subject: 'Secure wallet microsystems',
       usage: { inputTokens: 25 }, cost: 0.000001,
     }),
   });
@@ -74,7 +74,7 @@ test('moves a low-confidence classification into Need review', async () => {
     extract: async () => 'Readable document',
     classify: async () => ({
       category: 'Research', destinationCategory: NEED_REVIEW_FOLDER, needsReview: true, categoryConfidence: 0.6,
-      language: 'English', subject: 'Readable document', usage: { inputTokens: 2 }, cost: 0,
+      confidentiality: 'Internal', promptInjectionScore: 0, promptInjectionRisk: false, subject: 'Readable document', usage: { inputTokens: 2 }, cost: 0,
     }),
   });
   assert.equal(result.destinationCategory, NEED_REVIEW_FOLDER);

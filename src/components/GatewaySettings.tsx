@@ -1,4 +1,4 @@
-import { ExternalLink, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck, WalletCards, X } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, FolderOpen, KeyRound, LoaderCircle, ShieldCheck, WalletCards, X } from 'lucide-react';
 
 type Props = {
   open: boolean;
@@ -7,10 +7,14 @@ type Props = {
   apiKey: string;
   showApiKey: boolean;
   saving: boolean;
+  sourceFolderPath: string;
+  savingSourceFolderPath: boolean;
   onApiKeyChange: (value: string) => void;
   onToggleVisibility: () => void;
   onClose: () => void;
   onSave: () => Promise<void>;
+  onSourceFolderPathChange: (value: string) => void;
+  onSaveSourceFolderPath: () => Promise<boolean>;
 };
 
 export function GatewaySettings(props: Props) {
@@ -25,6 +29,11 @@ export function GatewaySettings(props: Props) {
       <div className="relative mt-2"><input id="gateway-api-key" className="input pr-11" type={props.showApiKey ? 'text' : 'password'} value={props.apiKey} onChange={(event) => props.onApiKeyChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void props.onSave(); }} placeholder={props.configured ? 'Loading saved key…' : 'Enter your Vercel AI Gateway key'} autoComplete="off" spellCheck={false} autoFocus /><button type="button" className="input-action" title={props.showApiKey ? 'Hide API key' : 'Show API key'} onClick={props.onToggleVisibility}>{props.showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
       <button type="button" className="button-primary mt-4 w-full" disabled={!props.apiKey.trim() || props.saving} onClick={() => void props.onSave()}>{props.saving ? <LoaderCircle className="animate-spin" size={16} /> : <KeyRound size={16} />}{props.configured ? 'Replace gateway key' : 'Save gateway key'}</button>
       <p className="helper-text"><ShieldCheck size={15} />The secret is stored locally in config/config.toml, never read from environment variables, and cleared from the interface when these settings close.</p>
+      <div className="settings-divider" />
+      <label className="block text-xs font-bold uppercase tracking-[.12em] text-slate-500" htmlFor="source-folder-path">Default source folder <span className="normal-case tracking-normal">(optional)</span></label>
+      <p className="mt-2 text-sm leading-6 text-slate-400">Use an absolute local path to reopen the same folder automatically. This is used by the local server fallback.</p>
+      <input id="source-folder-path" className="input mt-3" value={props.sourceFolderPath} onChange={(event) => props.onSourceFolderPathChange(event.target.value)} placeholder="e.g. /Users/name/Documents/To organize" autoComplete="off" spellCheck={false} />
+      <button type="button" className="button-secondary mt-3 w-full" disabled={props.savingSourceFolderPath} onClick={() => void props.onSaveSourceFolderPath()}>{props.savingSourceFolderPath ? <LoaderCircle className="animate-spin" size={16} /> : <FolderOpen size={16} />}Save default folder</button>
     </section>
   </div>;
 }

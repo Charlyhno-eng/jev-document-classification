@@ -19,7 +19,9 @@ export type LocalClassificationResult = {
   categoryConfidence: number | null;
   destinationCategory: string;
   needsReview: boolean;
-  language: string;
+  confidentiality: string;
+  promptInjectionScore: number;
+  promptInjectionRisk: boolean;
   subject: string;
   usage: { inputTokens: number };
   cost: number;
@@ -70,7 +72,9 @@ async function moveToNotProcessable(
     categoryConfidence: null,
     destinationCategory: NOT_PROCESSABLE_FOLDER,
     needsReview: false,
-    language: '—',
+    confidentiality: '—',
+    promptInjectionScore: 0,
+    promptInjectionRisk: false,
     subject: '—',
     usage: { inputTokens: 0 },
     cost: 0,

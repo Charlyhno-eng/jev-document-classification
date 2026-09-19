@@ -13,7 +13,7 @@ const input: ClassificationInput = {
 
 const result: ClassificationResult = {
   category: 'Research', categoryConfidence: 0.92, destinationCategory: 'Research', needsReview: false,
-  language: 'English', subject: 'Secure wallet recovery', usage: { inputTokens: 42 }, cost: 0.00000168,
+  confidentiality: 'Confidential', promptInjectionScore: 0, promptInjectionRisk: false, subject: 'Secure wallet recovery', usage: { inputTokens: 42 }, cost: 0.00000168,
 };
 
 test('reuses successful decisions without charging tokens a second time', async () => {

@@ -4,7 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import { readFile } from 'node:fs/promises';
 import { classifyCachedDocument } from './classification-cache.js';
-import { readAppConfig, toPublicConfig, writeApiKey, writeCategories } from './config.js';
+import { readAppConfig, toPublicConfig, writeApiKey, writeCategories, writeSourceFolderPath } from './config.js';
 import { categoryDocumentPath, chooseDirectory, listRootFileNames, readDocumentText, restoreFileFromCategory } from './documents.js';
 import { processLocalDocument } from './local-classification.js';
 import { fetchGatewayCredits } from './gateway-credits.js';
@@ -62,6 +62,14 @@ app.put('/api/config/api-key', async (request, response) => {
   }
 });
 
+app.put('/api/config/source-folder', async (request, response) => {
+  try {
+    response.json({ sourceFolderPath: await writeSourceFolderPath(request.body?.sourceFolderPath) });
+  } catch (error) {
+    response.status(400).json({ error: messageOf(error) });
+  }
+});
+
 app.post('/api/config/api-key/reveal', async (_request, response) => {
   try {
     const config = await readAppConfig();
@@ -95,6 +103,20 @@ app.post('/api/folders/select', async (_request, response) => {
     response.json({ folderId, name: path.basename(directoryPath), files: await listRootFileNames(directoryPath) });
   } catch (error) {
     response.status(500).json({ error: `The system folder picker could not be opened: ${messageOf(error)}` });
+  }
+});
+
+app.post('/api/folders/configured', async (_request, response) => {
+  try {
+    const { sourceFolderPath } = await readAppConfig();
+    if (!sourceFolderPath) return response.status(204).end();
+    const files = await listRootFileNames(sourceFolderPath);
+    const folderId = randomUUID();
+    folderSessions.clear();
+    folderSessions.set(folderId, sourceFolderPath);
+    response.json({ folderId, name: path.basename(sourceFolderPath), files });
+  } catch (error) {
+    response.status(422).json({ error: `The configured source folder is unavailable: ${messageOf(error)}` });
   }
 });
 

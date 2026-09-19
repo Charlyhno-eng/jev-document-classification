@@ -9,15 +9,6 @@ export type RunPerformance = {
   confidenceCount: number;
 };
 
-export function buildLanguageBreakdown(results: Classification[]) {
-  return results
-    .filter((item) => item.moved && !item.unprocessable && item.language !== '—')
-    .reduce<Record<string, number>>((counts, item) => {
-      counts[item.language] = (counts[item.language] ?? 0) + 1;
-      return counts;
-    }, {});
-}
-
 export function buildRunPerformance(results: Classification[], durationMs: number | null): RunPerformance {
   const confidenceValues = results.filter((item) => !item.unprocessable && item.confidence !== null).map((item) => item.confidence as number);
   return {

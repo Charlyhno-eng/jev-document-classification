@@ -28,11 +28,12 @@ const comparisons = await mapWithConcurrency(readableDocuments, 8, async ({ file
   ]);
   return {
     fileName,
-    structured: { category: structured.category, language: structured.language, subject: structured.subject, inputTokens: structured.usage.inputTokens, cost: structured.cost },
-    full: { category: full.category, language: full.language, subject: full.subject, inputTokens: full.usage.inputTokens, cost: full.cost },
+    structured: { category: structured.category, confidentiality: structured.confidentiality, promptInjectionScore: structured.promptInjectionScore, subject: structured.subject, inputTokens: structured.usage.inputTokens, cost: structured.cost },
+    full: { category: full.category, confidentiality: full.confidentiality, promptInjectionScore: full.promptInjectionScore, subject: full.subject, inputTokens: full.usage.inputTokens, cost: full.cost },
     agreement: {
       category: structured.category === full.category,
-      language: structured.language === full.language,
+      confidentiality: structured.confidentiality === full.confidentiality,
+      promptInjection: structured.promptInjectionScore === full.promptInjectionScore,
       subject: structured.subject === full.subject,
     },
   };
@@ -44,9 +45,10 @@ const totals = comparisons.reduce((total, comparison) => ({
   structuredCost: total.structuredCost + comparison.structured.cost,
   fullCost: total.fullCost + comparison.full.cost,
   categoryMatches: total.categoryMatches + Number(comparison.agreement.category),
-  languageMatches: total.languageMatches + Number(comparison.agreement.language),
+  confidentialityMatches: total.confidentialityMatches + Number(comparison.agreement.confidentiality),
+  promptInjectionMatches: total.promptInjectionMatches + Number(comparison.agreement.promptInjection),
   subjectMatches: total.subjectMatches + Number(comparison.agreement.subject),
-}), { structuredTokens: 0, fullTokens: 0, structuredCost: 0, fullCost: 0, categoryMatches: 0, languageMatches: 0, subjectMatches: 0 });
+}), { structuredTokens: 0, fullTokens: 0, structuredCost: 0, fullCost: 0, categoryMatches: 0, confidentialityMatches: 0, promptInjectionMatches: 0, subjectMatches: 0 });
 
 console.log(JSON.stringify({
   documents: comparisons.length,

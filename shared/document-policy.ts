@@ -1,9 +1,14 @@
 export const NOT_PROCESSABLE_FOLDER = 'Not processable';
 export const NEED_REVIEW_FOLDER = 'Need review';
+export const SUSPECTED_PROMPT_INJECTION_FOLDER = 'Suspected prompt injection';
 export const CATEGORY_CONFIDENCE_THRESHOLD = 0.75;
 
 export function needsReview(confidence: number | null) {
   return confidence !== null && confidence < CATEGORY_CONFIDENCE_THRESHOLD;
+}
+
+export function hasPromptInjectionRisk(score: number) {
+  return score > 50;
 }
 
 const PLAIN_TEXT_EXTENSIONS = new Set([

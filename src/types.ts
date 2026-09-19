@@ -2,7 +2,9 @@ export type Classification = {
   id: string;
   fileName: string;
   category: string;
-  language: string;
+  confidentiality: string;
+  promptInjectionScore: number;
+  promptInjectionRisk: boolean;
   subject: string;
   confidence: number | null;
   cacheHit?: boolean;

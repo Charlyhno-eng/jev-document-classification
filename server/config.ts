@@ -2,10 +2,10 @@ import { chmod, lstat, mkdir, readFile, realpath, rename, writeFile } from 'node
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { validateApiKey, validateCategoryName } from './security.js';
-import { NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER } from '../shared/document-policy.js';
+import { NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER, SUSPECTED_PROMPT_INJECTION_FOLDER } from '../shared/document-policy.js';
 
-export type AppConfig = { categories: string[]; apiKey: string };
-export const DEFAULT_CONFIG: AppConfig = { categories: ['Finance', 'Legal', 'Operations'], apiKey: '' };
+export type AppConfig = { categories: string[]; apiKey: string; sourceFolderPath: string };
+export const DEFAULT_CONFIG: AppConfig = { categories: ['Finance', 'Legal', 'Operations'], apiKey: '', sourceFolderPath: '' };
 
 export class ConfigStore {
   private updateQueue: Promise<void> = Promise.resolve();
@@ -28,7 +28,7 @@ export class ConfigStore {
   }
 
   async write(config: AppConfig) {
-    const validated = { categories: validateCategories(config.categories), apiKey: config.apiKey ? validateApiKey(config.apiKey) : '' };
+    const validated = { categories: validateCategories(config.categories), apiKey: config.apiKey ? validateApiKey(config.apiKey) : '', sourceFolderPath: validateSourceFolderPath(config.sourceFolderPath) };
     const configDirectory = path.dirname(this.configPath);
     await mkdir(configDirectory, { recursive: true });
     if (await realpath(configDirectory) !== path.resolve(configDirectory)) throw new Error('The configuration directory cannot be a symbolic link.');
@@ -54,6 +54,15 @@ export class ConfigStore {
     });
   }
 
+  async writeSourceFolderPath(value: unknown) {
+    return this.enqueue(async () => {
+      const current = await this.read();
+      const sourceFolderPath = validateSourceFolderPath(value);
+      await this.write({ ...current, sourceFolderPath });
+      return sourceFolderPath;
+    });
+  }
+
   private enqueue<T>(operation: () => Promise<T>) {
     const result = this.updateQueue.then(operation, operation);
     this.updateQueue = result.then(() => undefined, () => undefined);
@@ -72,24 +81,36 @@ export function parseConfig(contents: string): AppConfig {
   if (apiKeyMatch) {
     try { apiKey = JSON.parse(apiKeyMatch[1]) as string; } catch { throw new Error('ai.api_key must be a quoted string.'); }
   }
-  return { categories: validateCategories(categories), apiKey: apiKey ? validateApiKey(apiKey) : '' };
+  const sourceFolderPathMatch = contents.match(/^\s*source_folder_path\s*=\s*(\"(?:\\.|[^\"\\])*\")\s*$/m);
+  let sourceFolderPath = '';
+  if (sourceFolderPathMatch) {
+    try { sourceFolderPath = JSON.parse(sourceFolderPathMatch[1]) as string; } catch { throw new Error('folders.source_folder_path must be a quoted string.'); }
+  }
+  return { categories: validateCategories(categories), apiKey: apiKey ? validateApiKey(apiKey) : '', sourceFolderPath: validateSourceFolderPath(sourceFolderPath) };
 }
 
 export function serializeConfig(config: AppConfig) {
-  return ['[classification]', `categories = ${JSON.stringify(config.categories)}`, '', '[ai]', `api_key = ${JSON.stringify(config.apiKey)}`, ''].join('\n');
+  return ['[classification]', `categories = ${JSON.stringify(config.categories)}`, '', '[folders]', `source_folder_path = ${JSON.stringify(config.sourceFolderPath)}`, '', '[ai]', `api_key = ${JSON.stringify(config.apiKey)}`, ''].join('\n');
 }
 
 export function toPublicConfig(config: AppConfig) {
-  return { categories: config.categories, apiKeyConfigured: Boolean(config.apiKey) };
+  return { categories: config.categories, apiKeyConfigured: Boolean(config.apiKey), sourceFolderPath: config.sourceFolderPath };
+}
+
+export function validateSourceFolderPath(value: unknown) {
+  if (typeof value !== 'string') throw new Error('The default source folder path must be a string.');
+  const trimmed = value.trim();
+  if (trimmed.includes('\0')) throw new Error('The default source folder path is invalid.');
+  return trimmed;
 }
 
 export function validateCategories(value: unknown) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 50) throw new Error('Provide between 1 and 50 categories.');
   const categories = value.map(validateCategoryName);
   if (new Set(categories.map((category) => category.toLocaleLowerCase())).size !== categories.length) throw new Error('Category names must be unique.');
-  const reservedFolders = [NOT_PROCESSABLE_FOLDER, NEED_REVIEW_FOLDER];
+  const reservedFolders = [NOT_PROCESSABLE_FOLDER, NEED_REVIEW_FOLDER, SUSPECTED_PROMPT_INJECTION_FOLDER];
   if (categories.some((category) => reservedFolders.some((reserved) => category.toLocaleLowerCase() === reserved.toLocaleLowerCase()))) {
-    throw new Error(`“${NOT_PROCESSABLE_FOLDER}” and “${NEED_REVIEW_FOLDER}” are reserved folders.`);
+    throw new Error(`“${NOT_PROCESSABLE_FOLDER}”, “${NEED_REVIEW_FOLDER}”, and “${SUSPECTED_PROMPT_INJECTION_FOLDER}” are reserved folders.`);
   }
   return categories;
 }
@@ -100,3 +121,4 @@ export const readCategories = async () => (await configStore.read()).categories;
 export const readApiKey = async () => (await configStore.read()).apiKey;
 export const writeCategories = (categories: unknown) => configStore.writeCategories(categories);
 export const writeApiKey = (apiKey: unknown) => configStore.writeApiKey(apiKey);
+export const writeSourceFolderPath = (sourceFolderPath: unknown) => configStore.writeSourceFolderPath(sourceFolderPath);

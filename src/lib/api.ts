@@ -3,7 +3,9 @@ export type ClassificationApiResult = {
   categoryConfidence: number | null;
   destinationCategory: string;
   needsReview: boolean;
-  language: string;
+  confidentiality: string;
+  promptInjectionScore: number;
+  promptInjectionRisk: boolean;
   subject: string;
   usage: { inputTokens?: number };
   cost: number;
@@ -18,7 +20,7 @@ export type ClassificationApiResult = {
 type ErrorPayload = { error?: string };
 
 export async function loadConfig() {
-  return request<{ categories: string[]; apiKeyConfigured: boolean }>('/api/config');
+  return request<{ categories: string[]; apiKeyConfigured: boolean; sourceFolderPath: string }>('/api/config');
 }
 
 export async function loadGatewayCredits() {
@@ -33,12 +35,22 @@ export async function updateApiKey(apiKey: string) {
   return request<{ configured: boolean }>('/api/config/api-key', { method: 'PUT', body: JSON.stringify({ apiKey }) });
 }
 
+export async function updateSourceFolderPath(sourceFolderPath: string) {
+  return request<{ sourceFolderPath: string }>('/api/config/source-folder', { method: 'PUT', body: JSON.stringify({ sourceFolderPath }) });
+}
+
 export async function revealApiKey() {
   return request<{ apiKey: string }>('/api/config/api-key/reveal', { method: 'POST' });
 }
 
 export async function selectServerFolder() {
   const response = await fetch('/api/folders/select', { method: 'POST', headers: clientHeaders() });
+  if (response.status === 204) return null;
+  return parseResponse<{ folderId: string; name: string; files: string[] }>(response);
+}
+
+export async function selectConfiguredServerFolder() {
+  const response = await fetch('/api/folders/configured', { method: 'POST', headers: clientHeaders() });
   if (response.status === 204) return null;
   return parseResponse<{ folderId: string; name: string; files: string[] }>(response);
 }

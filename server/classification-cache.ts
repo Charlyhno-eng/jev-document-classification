@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { classifyDocument, type ClassificationInput, type ClassificationResult } from './classification.js';
 
 const CACHE_CAPACITY = 500;
-const CACHE_SCHEMA_VERSION = 'classification-cache-v1';
+const CACHE_SCHEMA_VERSION = 'classification-cache-v2';
 
 export class ClassificationCache {
   private readonly entries = new Map<string, ClassificationResult>();

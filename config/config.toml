@@ -1,5 +1,8 @@
 [classification]
-categories = ["Finance","Doctoral thesis","Whitepaper","Sport","Law document"]
+categories = ["Facture","Devis","Bon de livraison","Contrat client","Contrat d'embauche","KPI","Bon de commande","Relevé d'activité","Rapport d'intervention","Note de frais"]
+
+[folders]
+source_folder_path = ""
 
 [ai]
 api_key = ""

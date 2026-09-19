@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  classifyExtractedDocument, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectServerFolder,
-  listServerFolderFiles, loadServerPreview, undoServerMove, updateApiKey, updateCategories,
+  classifyExtractedDocument, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectConfiguredServerFolder, selectServerFolder,
+  listServerFolderFiles, loadServerPreview, undoServerMove, updateApiKey, updateCategories, updateSourceFolderPath,
 } from '../lib/api';
 import { readDocumentText } from '../lib/documents';
 import { listRootFiles, moveToCategory, restoreFromCategory } from '../lib/file-system';
 import { mapWithConcurrency } from '../lib/concurrency';
-import { buildLanguageBreakdown, buildRunPerformance } from '../lib/run-metrics';
+import { buildRunPerformance } from '../lib/run-metrics';
 import type { Classification, RunSummary } from '../types';
-import { extensionOf, isPreviewableImage, isSupportedDocument, NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER, unsupportedDocumentMessage } from '../../shared/document-policy';
+import { extensionOf, isPreviewableImage, isSupportedDocument, NEED_REVIEW_FOLDER, NOT_PROCESSABLE_FOLDER, SUSPECTED_PROMPT_INJECTION_FOLDER, unsupportedDocumentMessage } from '../../shared/document-policy';
 
 export type SourceFolder =
   | { kind: 'browser'; handle: FileSystemDirectoryHandle; name: string }
@@ -28,6 +28,8 @@ export function useDocumentClassification() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingApiKey, setIsSavingApiKey] = useState(false);
   const [isSavingCategories, setIsSavingCategories] = useState(false);
+  const [sourceFolderPath, setSourceFolderPath] = useState('');
+  const [isSavingSourceFolderPath, setIsSavingSourceFolderPath] = useState(false);
   const [results, setResults] = useState<Classification[]>([]);
   const [summary, setSummary] = useState<RunSummary | null>(null);
   const [fileCount, setFileCount] = useState(0);
@@ -41,7 +43,6 @@ export function useDocumentClassification() {
   const totalCost = useMemo(() => results.reduce((sum, item) => sum + item.cost, 0), [results]);
   const totalTokens = useMemo(() => results.reduce((sum, item) => sum + item.inputTokens, 0), [results]);
   const classified = results.filter((item) => item.moved && !item.unprocessable).length;
-  const languageBreakdown = useMemo(() => buildLanguageBreakdown(results), [results]);
   const categoryBreakdown = useMemo(() => countBy(results, (item) => item.category), [results]);
   const runPerformance = useMemo(() => buildRunPerformance(results, summary?.durationMs ?? null), [results, summary]);
 
@@ -49,9 +50,23 @@ export function useDocumentClassification() {
     void loadConfig().then((config) => {
       setCategories(config.categories);
       setApiKeyConfigured(config.apiKeyConfigured);
+      setSourceFolderPath(config.sourceFolderPath);
+      if (config.sourceFolderPath) void openConfiguredFolder();
       if (config.apiKeyConfigured) void refreshGatewayCredits();
     }).catch((reason) => setError(toMessage(reason))).finally(() => setConfigLoaded(true));
   }, []);
+
+  async function openConfiguredFolder() {
+    try {
+      const selected = await selectConfiguredServerFolder();
+      if (!selected) return;
+      setSourceFolder({ kind: 'server', ...selected });
+      setFileCount(selected.files.length);
+      setNotice(`${selected.files.length} root-level file${selected.files.length === 1 ? '' : 's'} ready from the default source folder.`);
+    } catch (reason) {
+      setError(toMessage(reason));
+    }
+  }
 
   async function selectFolder() {
     setError(null);
@@ -89,8 +104,8 @@ export function useDocumentClassification() {
       setError('That category already exists.');
       return;
     }
-    if ([NOT_PROCESSABLE_FOLDER, NEED_REVIEW_FOLDER].some((folder) => name.toLocaleLowerCase() === folder.toLocaleLowerCase())) {
-      setError(`“${NOT_PROCESSABLE_FOLDER}” and “${NEED_REVIEW_FOLDER}” are reserved folders.`);
+    if ([NOT_PROCESSABLE_FOLDER, NEED_REVIEW_FOLDER, SUSPECTED_PROMPT_INJECTION_FOLDER].some((folder) => name.toLocaleLowerCase() === folder.toLocaleLowerCase())) {
+      setError(`“${NOT_PROCESSABLE_FOLDER}”, “${NEED_REVIEW_FOLDER}”, and “${SUSPECTED_PROMPT_INJECTION_FOLDER}” are reserved folders.`);
       return;
     }
     await persistCategories([...categories, name], () => setNewCategory(''));
@@ -141,6 +156,23 @@ export function useDocumentClassification() {
     }
   }
 
+  async function saveSourceFolderPath() {
+    setIsSavingSourceFolderPath(true);
+    try {
+      const saved = await updateSourceFolderPath(sourceFolderPath);
+      setSourceFolderPath(saved.sourceFolderPath);
+      setError(null);
+      setNotice(saved.sourceFolderPath ? 'Default source folder saved.' : 'Default source folder cleared.');
+      if (saved.sourceFolderPath) await openConfiguredFolder();
+      return true;
+    } catch (reason) {
+      setError(toMessage(reason));
+      return false;
+    } finally {
+      setIsSavingSourceFolderPath(false);
+    }
+  }
+
   async function runClassification() {
     if (!sourceFolder || !categories.length || !apiKeyConfigured || isRunning) return;
     const folder = sourceFolder;
@@ -186,14 +218,14 @@ export function useDocumentClassification() {
             data = await classifyServerDocument(folder.folderId, item.name);
           }
           record = {
-            id: crypto.randomUUID(), fileName: item.name, category: data.destinationCategory, suggestedCategory: data.needsReview ? data.category : undefined,
-            destinationFileName: data.movedFileName ?? item.name, needsReview: data.needsReview, language: data.language, subject: data.subject,
+            id: crypto.randomUUID(), fileName: item.name, category: data.destinationCategory, suggestedCategory: data.needsReview || data.promptInjectionRisk ? data.category : undefined,
+            destinationFileName: data.movedFileName ?? item.name, needsReview: data.needsReview, confidentiality: data.confidentiality, promptInjectionScore: data.promptInjectionScore, promptInjectionRisk: data.promptInjectionRisk, subject: data.subject,
             confidence: data.categoryConfidence, cacheHit: data.cacheHit, savedInputTokens: data.savedInputTokens, savedCost: data.savedCost,
             inputTokens: data.usage.inputTokens ?? 0, cost: data.cost, moved: true,
             unprocessable: data.unprocessable, note: data.note,
           };
         } catch (reason) {
-          record = { id: crypto.randomUUID(), fileName: item.name, category: 'Not moved', language: '—', subject: '—', confidence: null, inputTokens: 0, cost: 0, moved: false, error: toMessage(reason) };
+          record = { id: crypto.randomUUID(), fileName: item.name, category: 'Not moved', confidentiality: '—', promptInjectionScore: 0, promptInjectionRisk: false, subject: '—', confidence: null, inputTokens: 0, cost: 0, moved: false, error: toMessage(reason) };
         }
         completed[index] = record;
         processed = completed.filter((result): result is Classification => result !== undefined);
@@ -203,8 +235,9 @@ export function useDocumentClassification() {
       setSummary({ durationMs, totalCost: processed.reduce((sum, item) => sum + item.cost, 0), totalInputTokens: processed.reduce((sum, item) => sum + item.inputTokens, 0), completedAt: new Date() });
       const unprocessableCount = processed.filter((item) => item.unprocessable).length;
       const reviewCount = processed.filter((item) => item.needsReview).length;
+      const promptInjectionCount = processed.filter((item) => item.promptInjectionRisk).length;
       const classifiedCount = processed.filter((item) => item.moved && !item.unprocessable).length;
-      setNotice(`${classifiedCount} file${classifiedCount === 1 ? '' : 's'} classified${reviewCount ? `; ${reviewCount} moved to ${NEED_REVIEW_FOLDER}` : ''}${unprocessableCount ? `; ${unprocessableCount} moved to ${NOT_PROCESSABLE_FOLDER}` : ''}.`);
+      setNotice(`${classifiedCount} file${classifiedCount === 1 ? '' : 's'} classified${reviewCount ? `; ${reviewCount} moved to ${NEED_REVIEW_FOLDER}` : ''}${promptInjectionCount ? `; ${promptInjectionCount} moved to ${SUSPECTED_PROMPT_INJECTION_FOLDER}` : ''}${unprocessableCount ? `; ${unprocessableCount} moved to ${NOT_PROCESSABLE_FOLDER}` : ''}.`);
     } catch (reason) {
       setError(toMessage(reason));
     } finally {
@@ -292,10 +325,10 @@ export function useDocumentClassification() {
   return {
     sourceFolder, categories, newCategory, setNewCategory, apiKey, setApiKey, apiKeyConfigured, gatewayCredits, configLoaded,
     showApiKey, setShowApiKey, isSavingApiKey, isSavingCategories, results, summary, fileCount,
-    isRunning, activeFile, notice, error, totalCost, totalTokens, classified, languageBreakdown, performance: runPerformance,
+    isRunning, activeFile, notice, error, totalCost, totalTokens, classified, performance: runPerformance,
     categoryBreakdown, undoingId, preview, selectFolder, addCategory, removeCategory,
     saveApiKey, runClassification, undoMove, previewDocument, closePreview, refreshGatewayCredits,
-    loadSavedApiKey, clearApiKeyInput,
+    loadSavedApiKey, clearApiKeyInput, sourceFolderPath, setSourceFolderPath, isSavingSourceFolderPath, saveSourceFolderPath,
   };
 }
 
@@ -313,7 +346,9 @@ async function moveBrowserFileToNotProcessable(
     categoryConfidence: null,
     destinationCategory: NOT_PROCESSABLE_FOLDER,
     needsReview: false,
-    language: '—',
+    confidentiality: '—',
+    promptInjectionScore: 0,
+    promptInjectionRisk: false,
     subject: '—',
     usage: { inputTokens: 0 },
     cost: 0,
