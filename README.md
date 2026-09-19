@@ -22,7 +22,11 @@ Configure a Vercel AI Gateway key in the application to start classifying.
 
 ## See JEV Document Classification in action
 
-<video src="assets/jev-doc-classification-demo.mp4" controls width="100%"></video>
+![JEV Document Classification example1](assets/1.png)
+
+![JEV Document Classification example2](assets/2.png)
+
+![JEV Document Classification example3](assets/3.png)
 
 ---
 
