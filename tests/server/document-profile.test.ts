@@ -14,9 +14,8 @@ test('builds a bounded structured profile for long documents', () => {
   assert.ok(profile.profileCharacters < profile.sourceCharacters);
 });
 
-test('keeps the former full-text context available for an A/B benchmark', () => {
-  const structured = buildClassificationContext('security-review.txt', longDocument, 'structured');
-  const full = buildClassificationContext('security-review.txt', longDocument, 'full');
-  assert.ok(structured.length < full.length);
-  assert.match(full, /Document text:/);
+test('builds a bounded structured classification context', () => {
+  const structured = buildClassificationContext('security-review.txt', longDocument);
+  assert.ok(structured.length <= MAX_DOCUMENT_PROFILE_CHARACTERS);
+  assert.match(structured, /Likely headings:/);
 });

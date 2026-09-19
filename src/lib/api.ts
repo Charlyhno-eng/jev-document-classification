@@ -59,6 +59,10 @@ export function classifyExtractedDocument(fileName: string, text: string) {
   return request<ClassificationApiResult>('/api/classify', { method: 'POST', body: JSON.stringify({ fileName, text }) });
 }
 
+export function classifyShortExtractedDocuments(documents: Array<{ fileName: string; text: string }>) {
+  return request<{ results: ClassificationApiResult[] }>('/api/classify/batch', { method: 'POST', body: JSON.stringify({ documents }) });
+}
+
 export function classifyServerDocument(folderId: string, fileName: string) {
   return request<ClassificationApiResult>(`/api/folders/${encodeURIComponent(folderId)}/classify`, { method: 'POST', body: JSON.stringify({ fileName }) });
 }

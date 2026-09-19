@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { classifyDocument, PRICE_PER_MILLION_INPUT_TOKENS, type EvaluationRunner } from '../../server/classification.js';
+import { classifyDocument, classifyShortDocumentBatch, PRICE_PER_MILLION_INPUT_TOKENS, SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS, type EvaluationRunner } from '../../server/classification.js';
 import { NEED_REVIEW_FOLDER, SUSPECTED_PROMPT_INJECTION_FOLDER } from '../../shared/document-policy.js';
 import { TEST_GATEWAY_API_KEY } from '../helpers/fixtures.js';
 
@@ -66,6 +66,23 @@ test('rejects invented subjects and invalid usage from the provider', async () =
   await assert.rejects(() => classifyDocument(input, inventedSubject), /outside the extracted candidates/);
   const invalidUsage: EvaluationRunner = async (request) => ({ category: 'Whitepaper', categoryConfidence: 1, confidentiality: 'Internal', promptInjectionScore: '0', subject: request.subjectCandidates[0], inputTokens: -1 });
   await assert.rejects(() => classifyDocument(input, invalidUsage), /invalid token usage/);
+});
+
+test('retries once when the provider returns an internally inconsistent choice distribution', async () => {
+  let attempts = 0;
+  const runner: EvaluationRunner = async (request) => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('Question "confidentiality" did not select a highest-probability option.');
+    return { category: 'Whitepaper', categoryConfidence: 1, confidentiality: 'Internal', promptInjectionScore: '0', subject: request.subjectCandidates[0], inputTokens: 1 };
+  };
+  const result = await classifyDocument(input, runner);
+  assert.equal(attempts, 2);
+  assert.equal(result.category, 'Whitepaper');
+});
+
+test('rejects short-document batches that exceed the safe batch size before contacting JEV', async () => {
+  const documents = Array.from({ length: SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS + 1 }, (_, index) => ({ ...input, fileName: `note-${index}.txt`, text: 'Short note.' }));
+  await assert.rejects(() => classifyShortDocumentBatch(documents), /between 1 and 8 documents/);
 });
 
 test('does not request the paid Zero Data Retention Gateway option', async () => {

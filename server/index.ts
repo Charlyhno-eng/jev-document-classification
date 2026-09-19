@@ -4,6 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import { readFile } from 'node:fs/promises';
 import { classifyCachedDocument } from './classification-cache.js';
+import { classifyShortDocumentBatch, SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS } from './classification.js';
 import { readAppConfig, toPublicConfig, writeApiKey, writeCategories, writeSourceFolderPath } from './config.js';
 import { categoryDocumentPath, chooseDirectory, listRootFileNames, readDocumentText, restoreFileFromCategory } from './documents.js';
 import { processLocalDocument } from './local-classification.js';
@@ -128,6 +129,27 @@ app.post('/api/classify', async (request, response) => {
     const config = await readAppConfig();
     if (!config.apiKey) throw new Error('Configure a Vercel AI Gateway API key before starting a run.');
     response.json(await classifyCachedDocument({ fileName, text: text.trim(), categories: config.categories, apiKey: config.apiKey }));
+  } catch (error) {
+    response.status(422).json({ error: messageOf(error) });
+  }
+});
+
+app.post('/api/classify/batch', async (request, response) => {
+  const { documents } = request.body as { documents?: unknown };
+  try {
+    if (!Array.isArray(documents) || !documents.length || documents.length > SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS) {
+      throw new Error(`Send between 1 and ${SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS} short documents to batch classification.`);
+    }
+    const validDocuments = documents.map((document) => {
+      if (!document || typeof document !== 'object') throw new Error('Each batch item requires a file name and extracted text.');
+      const { fileName, text } = document as { fileName?: unknown; text?: unknown };
+      if (typeof fileName !== 'string' || typeof text !== 'string' || !text.trim()) throw new Error('Each batch item requires a file name and extracted text.');
+      resolveRootFile('/virtual-root', fileName);
+      return { fileName, text: text.trim() };
+    });
+    const config = await readAppConfig();
+    if (!config.apiKey) throw new Error('Configure a Vercel AI Gateway API key before starting a run.');
+    response.json({ results: await classifyShortDocumentBatch(validDocuments.map((document) => ({ ...document, categories: config.categories, apiKey: config.apiKey }))) });
   } catch (error) {
     response.status(422).json({ error: messageOf(error) });
   }

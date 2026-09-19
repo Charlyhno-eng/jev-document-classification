@@ -4,19 +4,9 @@
 
 ---
 
-JEV Document Classification sorts documents from a selected folder into category subfolders.  
-It uses `typesafe-ai/jev`, an evaluation model from the `typesafe-ai` team, through Vercel AI Gateway.  
-JEV returns fast, typed classification decisions at very low cost.  
-Choose a folder and add the destination categories in the application.  
-The application extracts readable text from supported files before asking JEV to classify them.  
-JEV is not multimodal and cannot interpret images or other visual content.  
-Unsupported files and documents without extractable text go into a `Not processable` folder.  
-Readable documents move into subfolders matching the configured categories.  
-Each result includes a confidentiality level, a prompt injection risk score, and a precise subject, alongside its category. Scores above 50 move the document to `Suspected prompt injection` for review.
-The audit also shows JEV's category confidence. Documents below 75% confidence move to `Need review`, while retaining JEV's suggested category for review.
-The audit can preview a moved PDF, readable document, or common image in the browser, and restore an individual file to the source folder.
-Runs report processing time, input tokens, and estimated API cost.  
-Configure a Vercel AI Gateway key in the application to start classifying.
+JEV Document Classification is a local-first application that files root-level documents into configured category folders. It extracts readable text locally, then uses `typesafe-ai/jev` through Vercel AI Gateway for typed category, confidentiality, prompt-injection-risk, and subject decisions.
+
+Unsupported, unreadable, and empty documents go to `Not processable`. Low-confidence category decisions go to `Need review`, and suspicious prompt-injection scores go to `Suspected prompt injection`. Files are never overwritten; the audit supports preview and undo. Runs report duration, input tokens, and estimated cost.
 
 ---
 
@@ -60,11 +50,11 @@ npm run dev
 
 Open `http://localhost:5173`, enter a Vercel AI Gateway API key, choose a folder, and start classification. The application creates `config/config.toml` when it is missing. You may optionally save an absolute default source-folder path in Gateway settings; the local server will reopen it automatically.
 
-## Confidence and review queue
+## Classification behavior
 
 JEV supplies a probability for its selected category when the provider returns one. The application sends a document to `Need review` when that probability is below `0.75`. The audit records both the actual destination and the category JEV originally suggested, so a reviewer can quickly decide where it belongs.
 
-If a probability is unavailable, the audit displays `Unavailable` and the document is filed in JEV's selected category. `Need review` and `Not processable` are reserved folder names and cannot be added as regular categories.
+If a probability is unavailable, the audit displays `Unavailable` and the document is filed in JEV's selected category. `Need review`, `Not processable`, and `Suspected prompt injection` are reserved folder names.
 
 ## Preview and undo
 
@@ -72,18 +62,8 @@ Each moved file has a **View** action in the run audit. PDFs render directly in 
 
 The **Undo** action restores that file to the selected root folder. If another file already uses the original name, the restored file receives a numbered name such as `report (1).pdf`; no file is overwritten.
 
-## Faster, lower-cost classification
+## Efficient classification
 
 Each document is reduced locally to a structured profile before JEV receives it. For long documents, the profile is capped at 4,500 characters and includes likely headings, locally extracted subject candidates, and representative excerpts from the beginning, middle, and end. Short documents keep their full text when that is already smaller than the profile limit. The original document text never leaves the local application beyond this bounded context.
 
-Category, confidentiality level, prompt injection score, and precise subject use one typed JEV evaluation request per document. Prompt injection is assessed from 0 to 100 in increments of ten; scores above 50 are isolated for review. The application processes up to 16 documents concurrently, so independent Vercel AI Gateway calls overlap while each document still moves only after its own request succeeds.
-
-### Compare the compact profile with the former full-text context
-
-Run the benchmark against a copy of a representative source folder before a classification run:
-
-```bash
-npm run benchmark:classification -- /absolute/path/to/folder
-```
-
-It processes up to ten readable root-level documents without moving them. Each document is sent once with the structured profile and once with the former 24,000-character context. The JSON report contains each pair of decisions, category/confidentiality/prompt-injection/subject agreement, actual input tokens, actual estimated cost, and aggregate token and cost reduction. Agreement measures whether the two contexts reach the same decision; use documents with known expected categories if you need an accuracy measure against ground truth.
+Each document uses typed JEV choices for category, confidentiality, prompt injection score, and subject. Very short documents are intelligently grouped into a shared JEV evaluation request (up to 8 documents and 4,500 context characters); larger documents remain individual requests. Every file moves only after its own successful decision.

@@ -4,8 +4,10 @@ import { buildDocumentProfile } from './document-profile.js';
 import { NEED_REVIEW_FOLDER, SUSPECTED_PROMPT_INJECTION_FOLDER, hasPromptInjectionRisk, needsReview } from '../shared/document-policy.js';
 
 export const PRICE_PER_MILLION_INPUT_TOKENS = 0.04;
-export type ClassificationContextMode = 'structured' | 'full';
 export const MAX_SUBJECT_CHOICES = 10;
+export const SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS = 8;
+export const SHORT_DOCUMENT_BATCH_MAX_CHARACTERS = 4_500;
+export const SHORT_DOCUMENT_MAX_CHARACTERS = 800;
 const PROMPT_INJECTION_SCORES = Array.from({ length: 11 }, (_, index) => String(index * 10));
 
 export type ClassificationInput = {
@@ -47,14 +49,36 @@ type EvaluationInput = ClassificationInput & {
 
 export type EvaluationRunner = (input: EvaluationInput) => Promise<ClassificationDecision>;
 
+type PreparedEvaluationInput = EvaluationInput & { id: string };
+
 export async function classifyDocument(
   input: ClassificationInput,
   runner: EvaluationRunner = runJevEvaluation,
-  options: { contextMode?: ClassificationContextMode } = {},
 ): Promise<ClassificationResult> {
   const subjectCandidates = extractSubjectCandidates(input.fileName, input.text, MAX_SUBJECT_CHOICES);
-  const documentContext = buildClassificationContext(input.fileName, input.text, options.contextMode ?? 'structured');
-  const decision = await runner({ ...input, subjectCandidates, documentContext });
+  const documentContext = buildClassificationContext(input.fileName, input.text);
+  const decision = await runWithInvalidChoiceRetry(() => runner({ ...input, subjectCandidates, documentContext }));
+  return toClassificationResult(input, subjectCandidates, decision);
+}
+
+/** Evaluates several short documents together while retaining one typed answer set per document. */
+export async function classifyShortDocumentBatch(inputs: ClassificationInput[]): Promise<ClassificationResult[]> {
+  if (!inputs.length || inputs.length > SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS) throw new Error('A short-document batch must contain between 1 and 8 documents.');
+  const prepared = inputs.map((input, index) => ({
+    ...input,
+    id: `document_${index + 1}`,
+    subjectCandidates: extractSubjectCandidates(input.fileName, input.text, MAX_SUBJECT_CHOICES),
+    documentContext: buildClassificationContext(input.fileName, input.text),
+  }));
+  const totalCharacters = prepared.reduce((total, item) => total + item.documentContext.length, 0);
+  if (totalCharacters > SHORT_DOCUMENT_BATCH_MAX_CHARACTERS || prepared.some((item) => item.text.length > SHORT_DOCUMENT_MAX_CHARACTERS)) {
+    throw new Error('This batch contains a document that is too large for short-document batching.');
+  }
+  const decisions = await runJevBatchEvaluation(prepared);
+  return prepared.map((item, index) => toClassificationResult(item, item.subjectCandidates, decisions[index]));
+}
+
+function toClassificationResult(input: ClassificationInput, subjectCandidates: string[], decision: ClassificationDecision): ClassificationResult {
   if (!input.categories.includes(decision.category)) throw new Error('JEV returned a category outside the configured choices.');
   if (!subjectCandidates.includes(decision.subject)) throw new Error('JEV returned a subject outside the extracted candidates.');
   if (!PROMPT_INJECTION_SCORES.includes(decision.promptInjectionScore)) throw new Error('JEV returned an invalid prompt injection score.');
@@ -75,8 +99,7 @@ export async function classifyDocument(
   };
 }
 
-export function buildClassificationContext(fileName: string, text: string, mode: ClassificationContextMode = 'structured') {
-  if (mode === 'full') return `Document filename: ${fileName}\n\nDocument text:\n${text.trim().slice(0, 24_000)}`;
+export function buildClassificationContext(fileName: string, text: string) {
   return buildDocumentProfile(fileName, text).content;
 }
 
@@ -116,4 +139,64 @@ async function runJevEvaluation(input: EvaluationInput): Promise<ClassificationD
     subject: result.answers.subject.choice,
     inputTokens: result.usage.inputTokens ?? 0,
   };
+}
+
+async function runJevBatchEvaluation(inputs: PreparedEvaluationInput[]): Promise<ClassificationDecision[]> {
+  const questions: Record<string, { type: 'choice'; instructions: string; criteria: Record<string, string> }> = {};
+  for (const input of inputs) {
+    const prefix = `${input.id}: `;
+    questions[`${input.id}_category`] = { type: 'choice', instructions: `${prefix}choose the best configured destination folder.`, criteria: choiceCriteria(input.categories, 'Destination') };
+    questions[`${input.id}_confidentiality`] = { type: 'choice', instructions: `${prefix}assess sensitivity and choose the highest applicable confidentiality level.`, criteria: confidentialityCriteria() };
+    questions[`${input.id}_promptInjectionScore`] = { type: 'choice', instructions: `${prefix}assess prompt-injection risk from 0 to 100 in increments of ten. A score above 50 requires clear suspicious instructions.`, criteria: choiceCriteria(PROMPT_INJECTION_SCORES, 'Prompt injection risk score') };
+    questions[`${input.id}_subject`] = { type: 'choice', instructions: `${prefix}choose the most precise central subject.`, criteria: choiceCriteria(input.subjectCandidates, 'Subject') };
+  }
+  const gateway = createGateway({ apiKey: inputs[0].apiKey });
+  const result = await runWithInvalidChoiceRetry(() => evaluate({
+    model: gateway.evaluation('typesafe-ai/jev'),
+    state: inputs.map(({ id, fileName, documentContext }) => ({ id, fileName, profile: documentContext })),
+    questions,
+  }));
+  const inputTokens = result.usage.inputTokens ?? 0;
+  const totalCharacters = inputs.reduce((total, item) => total + item.documentContext.length, 0);
+  let assignedTokens = 0;
+  return inputs.map((input, index) => {
+    const inputTokensForDocument = index === inputs.length - 1
+      ? inputTokens - assignedTokens
+      : Math.round(inputTokens * input.documentContext.length / totalCharacters);
+    assignedTokens += inputTokensForDocument;
+    return {
+    category: result.answers[`${input.id}_category`].choice,
+    categoryConfidence: result.answers[`${input.id}_category`].probabilities?.[result.answers[`${input.id}_category`].choice] ?? null,
+    confidentiality: result.answers[`${input.id}_confidentiality`].choice,
+    promptInjectionScore: result.answers[`${input.id}_promptInjectionScore`].choice,
+    subject: result.answers[`${input.id}_subject`].choice,
+    inputTokens: inputTokensForDocument,
+    };
+  });
+}
+
+function choiceCriteria(options: string[], label: string) {
+  return Object.fromEntries(options.map((option) => [option, `${label}: ${option}.`]));
+}
+
+function confidentialityCriteria() {
+  return {
+    Public: 'Safe to share publicly; contains no sensitive business or personal information.',
+    Internal: 'For internal use; contains routine business information that should not be public.',
+    Confidential: 'Contains sensitive business, financial, contractual, or personal information.',
+    Restricted: 'Contains highly sensitive personal data, credentials, health data, legal privilege, or critical business secrets.',
+  };
+}
+
+async function runWithInvalidChoiceRetry<Result>(run: () => Promise<Result>) {
+  try {
+    return await run();
+  } catch (error) {
+    if (!isInvalidChoiceDistribution(error)) throw error;
+    return run();
+  }
+}
+
+function isInvalidChoiceDistribution(error: unknown) {
+  return error instanceof Error && /did not select a highest-probability option/.test(error.message);
 }

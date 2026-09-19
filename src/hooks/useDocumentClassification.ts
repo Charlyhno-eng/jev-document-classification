@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  classifyExtractedDocument, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectConfiguredServerFolder, selectServerFolder,
+  classifyExtractedDocument, classifyShortExtractedDocuments, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectConfiguredServerFolder, selectServerFolder,
   listServerFolderFiles, loadServerPreview, undoServerMove, updateApiKey, updateCategories, updateSourceFolderPath,
 } from '../lib/api';
 import { readDocumentText } from '../lib/documents';
@@ -16,6 +16,9 @@ export type SourceFolder =
 
 export type DocumentPreview = { title: string; kind: 'pdf' | 'image' | 'text'; url?: string; text?: string };
 const CLASSIFICATION_CONCURRENCY = 16;
+const SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS = 8;
+const SHORT_DOCUMENT_BATCH_MAX_CHARACTERS = 4_500;
+const SHORT_DOCUMENT_MAX_CHARACTERS = 800;
 
 export function useDocumentClassification() {
   const [sourceFolder, setSourceFolder] = useState<SourceFolder | null>(null);
@@ -188,6 +191,28 @@ export function useDocumentClassification() {
         : (await listServerFolderFiles(folder.folderId)).files.map((name) => ({ name }));
       setFileCount(files.length);
       if (!files.length) throw new Error('This folder has no root-level files to classify.');
+      const preparedTexts = new Map<string, string>();
+      const batchedResults = new Map<string, Awaited<ReturnType<typeof classifyExtractedDocument>>>();
+      if (folder.kind === 'browser') {
+        await mapWithConcurrency(files, CLASSIFICATION_CONCURRENCY, async (item) => {
+          if (!item.handle || !isSupportedDocument(item.name)) return;
+          try {
+            const text = (await readDocumentText(await item.handle.getFile())).trim();
+            if (text) preparedTexts.set(item.name, text);
+          } catch {
+            // The normal per-file path records the extraction error and moves only that file.
+          }
+        });
+        const batches = groupShortDocuments([...preparedTexts].map(([fileName, text]) => ({ fileName, text })));
+        for (const batch of batches) {
+          try {
+            const { results } = await classifyShortExtractedDocuments(batch);
+            results.forEach((result, index) => batchedResults.set(batch[index].fileName, result));
+          } catch {
+            // A failed batch is retried as individual requests, keeping its files untouched until then.
+          }
+        }
+      }
       const completed: Array<Classification | undefined> = Array(files.length);
       await mapWithConcurrency(files, CLASSIFICATION_CONCURRENCY, async (item, index) => {
         setActiveFile(item.name);
@@ -200,17 +225,19 @@ export function useDocumentClassification() {
               data = await moveBrowserFileToNotProcessable(folder.handle, item.handle, unsupportedDocumentMessage(item.name));
             } else {
               const file = await item.handle.getFile();
-              let extractedText = '';
-              try {
-                extractedText = (await readDocumentText(file)).trim();
-              } catch (reason) {
-                data = await moveBrowserFileToNotProcessable(folder.handle, item.handle, `Text extraction failed: ${toMessage(reason)}`);
+              let extractedText = preparedTexts.get(item.name) ?? '';
+              if (!extractedText) {
+                try {
+                  extractedText = (await readDocumentText(file)).trim();
+                } catch (reason) {
+                  data = await moveBrowserFileToNotProcessable(folder.handle, item.handle, `Text extraction failed: ${toMessage(reason)}`);
+                }
               }
               if (!data && !extractedText) {
                 data = await moveBrowserFileToNotProcessable(folder.handle, item.handle, 'No selectable text was found. The document may require OCR.');
               }
               if (!data) {
-                data = await classifyExtractedDocument(file.name, extractedText);
+                data = batchedResults.get(item.name) ?? await classifyExtractedDocument(file.name, extractedText);
                 data.movedFileName = await moveToCategory(folder.handle, item.handle, data.destinationCategory);
               }
             }
@@ -334,6 +361,24 @@ export function useDocumentClassification() {
 
 function countBy<T>(items: T[], key: (item: T) => string) { return items.reduce<Record<string, number>>((counts, item) => { const value = key(item); counts[value] = (counts[value] ?? 0) + 1; return counts; }, {}); }
 function toMessage(reason: unknown) { return reason instanceof Error ? reason.message : 'An unexpected error occurred.'; }
+
+function groupShortDocuments(documents: Array<{ fileName: string; text: string }>) {
+  const batches: Array<Array<{ fileName: string; text: string }>> = [];
+  let batch: Array<{ fileName: string; text: string }> = [];
+  let characters = 0;
+  for (const document of documents) {
+    if (document.text.length > SHORT_DOCUMENT_MAX_CHARACTERS) continue;
+    if (batch.length === SHORT_DOCUMENT_BATCH_MAX_DOCUMENTS || characters + document.text.length > SHORT_DOCUMENT_BATCH_MAX_CHARACTERS) {
+      if (batch.length) batches.push(batch);
+      batch = [];
+      characters = 0;
+    }
+    batch.push(document);
+    characters += document.text.length;
+  }
+  if (batch.length) batches.push(batch);
+  return batches;
+}
 
 async function moveBrowserFileToNotProcessable(
   root: FileSystemDirectoryHandle,

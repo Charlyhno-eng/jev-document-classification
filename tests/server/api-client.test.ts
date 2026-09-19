@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyExtractedDocument, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectServerFolder, updateApiKey, updateCategories } from '../../src/lib/api.js';
+import { classifyExtractedDocument, classifyShortExtractedDocuments, classifyServerDocument, loadConfig, loadGatewayCredits, revealApiKey, selectServerFolder, updateApiKey, updateCategories } from '../../src/lib/api.js';
 import { TEST_GATEWAY_API_KEY } from '../helpers/fixtures.js';
 
 test('client API sends the local mutation marker and never expects the saved key back', async (context) => {
@@ -39,6 +39,9 @@ test('client API handles category updates, classification routes, and cancelled 
   assert.deepEqual(await updateCategories(['Research']), { categories: ['Research'] });
   assert.equal(await selectServerFolder(), null);
   assert.equal((await classifyExtractedDocument('paper.pdf', 'text')).category, 'Research');
+  await classifyShortExtractedDocuments([{ fileName: 'note.txt', text: 'short text' }]);
+  assert.equal(requests.at(-1)?.url, '/api/classify/batch');
+  assert.deepEqual(JSON.parse(requests.at(-1)?.body ?? ''), { documents: [{ fileName: 'note.txt', text: 'short text' }] });
   assert.equal((await classifyServerDocument('folder id', 'paper.pdf')).subject, 'Secure wallets');
   assert.equal(requests.at(-1)?.url, '/api/folders/folder%20id/classify');
   assert.deepEqual(JSON.parse(requests.at(-1)?.body ?? ''), { fileName: 'paper.pdf' });
